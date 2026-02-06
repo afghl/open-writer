@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@open-write/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Web package placeholder' && exit 0"
+  }
+}
