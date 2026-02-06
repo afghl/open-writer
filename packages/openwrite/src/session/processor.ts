@@ -1,0 +1,189 @@
+import { Identifier } from "@/id/id"
+import { Session } from "@/session"
+import { Message } from "@/session/message"
+import type { Tool } from "@/tool/tool"
+import { LLM } from "@/session/llm"
+import type { ModelMessage } from "ai"
+
+type CreateInput = {
+  assistantMessage: Message.Assistant
+  sessionID: string
+  user: Message.User
+  history: Message.WithParts[]
+  tools: Array<Awaited<ReturnType<Tool.Info["init"]>> & { id: string }>
+  messages: ModelMessage[]
+  abort: AbortSignal
+}
+
+export namespace SessionProcessor {
+  export const create = (input: CreateInput) => {
+    const toolcalls = new Map<string, Message.ToolPart>()
+    let currentText: Message.TextPart | undefined
+
+    const result = {
+      get message() {
+        return input.assistantMessage
+      },
+      async process() {
+        const stream = await LLM.stream({
+          sessionID: input.sessionID,
+          user: input.user,
+          agent: input.user.agent,
+          messageID: input.assistantMessage.id,
+          messages: input.messages,
+          tools: input.tools,
+          history: input.history,
+          abort: input.abort,
+          system: [],
+        })
+
+        for await (const value of stream.fullStream as AsyncIterable<any>) {
+          switch (value.type) {
+            case "text-start": {
+              currentText = {
+                id: Identifier.ascending("part"),
+                sessionID: input.sessionID,
+                messageID: input.assistantMessage.id,
+                type: "text",
+                text: "",
+                time: { start: Date.now() },
+              }
+              break
+            }
+            case "text-delta": {
+              if (!currentText) {
+                currentText = {
+                  id: Identifier.ascending("part"),
+                  sessionID: input.sessionID,
+                  messageID: input.assistantMessage.id,
+                  type: "text",
+                  text: "",
+                  time: { start: Date.now() },
+                }
+              }
+              currentText.text += value.text
+              await Session.updatePart(currentText)
+              break
+            }
+            case "text-end": {
+              if (currentText) {
+                currentText.time = { start: currentText.time?.start ?? Date.now(), end: Date.now() }
+                await Session.updatePart(currentText)
+              }
+              currentText = undefined
+              break
+            }
+            case "tool-input-start": {
+              if (!toolcalls.has(value.id)) {
+                const part: Message.ToolPart = {
+                  id: Identifier.ascending("part"),
+                  sessionID: input.sessionID,
+                  messageID: input.assistantMessage.id,
+                  type: "tool",
+                  callID: value.id,
+                  tool: value.toolName,
+                  state: {
+                    status: "pending",
+                    input: {},
+                    raw: "",
+                  },
+                }
+                toolcalls.set(value.id, part)
+                await Session.updatePart(part)
+              }
+              break
+            }
+            case "tool-call": {
+              const part: Message.ToolPart = {
+                id: toolcalls.get(value.toolCallId)?.id ?? Identifier.ascending("part"),
+                sessionID: input.sessionID,
+                messageID: input.assistantMessage.id,
+                type: "tool",
+                callID: value.toolCallId,
+                tool: value.toolName,
+                state: {
+                  status: "running",
+                  input: value.input ?? {},
+                  time: { start: Date.now() },
+                },
+              }
+              toolcalls.set(value.toolCallId, part)
+              await Session.updatePart(part)
+              break
+            }
+            case "tool-result": {
+              const match = toolcalls.get(value.toolCallId)
+              if (!match) break
+              const outputPayload = value.output ?? {}
+              const output =
+                typeof outputPayload === "string"
+                  ? outputPayload
+                  : typeof outputPayload.output === "string"
+                    ? outputPayload.output
+                    : JSON.stringify(outputPayload)
+              const completed: Message.ToolPart = {
+                ...match,
+                state: {
+                  status: "completed",
+                  input: value.input ?? match.state.input,
+                  output,
+                  title: outputPayload.title ?? match.tool,
+                  metadata: outputPayload.metadata ?? {},
+                  time: {
+                    start: match.state.status === "running" ? match.state.time.start : Date.now(),
+                    end: Date.now(),
+                  },
+                },
+              }
+              await Session.updatePart(completed)
+              toolcalls.delete(value.toolCallId)
+              break
+            }
+            case "tool-error": {
+              const match = toolcalls.get(value.toolCallId)
+              if (!match) break
+              const failed: Message.ToolPart = {
+                ...match,
+                state: {
+                  status: "error",
+                  input: value.input ?? match.state.input,
+                  error: String(value.error ?? "Tool execution failed"),
+                  time: {
+                    start: match.state.status === "running" ? match.state.time.start : Date.now(),
+                    end: Date.now(),
+                  },
+                },
+              }
+              await Session.updatePart(failed)
+              toolcalls.delete(value.toolCallId)
+              break
+            }
+            case "finish": {
+              input.assistantMessage.time.completed = Date.now()
+              await Session.updateMessage(input.assistantMessage)
+              break
+            }
+            case "error": {
+              throw value.error
+            }
+            default:
+              break
+          }
+        }
+
+        if (currentText) {
+          currentText.time = { start: currentText.time?.start ?? Date.now(), end: Date.now() }
+          await Session.updatePart(currentText)
+          currentText = undefined
+        }
+
+        input.assistantMessage.time.completed = Date.now()
+        await Session.updateMessage(input.assistantMessage)
+
+        const parts = await Session.parts(input.assistantMessage.id)
+        return { info: input.assistantMessage, parts }
+      },
+    }
+    return result
+  }
+}

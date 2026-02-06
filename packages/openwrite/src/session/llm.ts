@@ -1,23 +1,86 @@
-import { generateText } from "ai"
 import { createOpenAI } from "@ai-sdk/openai"
-import { getEnv } from "@/config/config"
+import { generateText, streamText, tool, zodSchema } from "ai"
+import type { ModelMessage, Tool as AITool } from "ai"
+import type { Message } from "@/session/message"
+import type { Tool } from "@/tool/tool"
+import { Permission } from "@/permission/permission"
 
-export const generate = async (prompt: string) => {
-  const apiKey = getEnv("OPENAI_API_KEY")
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not set")
+export namespace LLM {
+  export type StreamInput = {
+    sessionID: string
+    user: Message.User
+    agent: string
+    messageID: string
+    messages: ModelMessage[]
+    tools: Array<Awaited<ReturnType<Tool.Info["init"]>> & { id: string }>
+    history: Message.WithParts[]
+    abort: AbortSignal
+    system?: string[]
   }
 
-  const provider = createOpenAI({
-    apiKey,
-    baseURL: getEnv("OPENAI_BASE_URL"),
-  })
-  const model = provider("gpt-4o-mini")
+  export async function stream(input: StreamInput) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not set")
+    }
 
-  const result = await generateText({
-    model,
-    prompt,
-  })
+    const provider = createOpenAI({
+      apiKey,
+      baseURL: process.env.OPENAI_BASE_URL,
+    })
+    const model = provider("gpt-4o-mini")
 
-  return result.text
+    const tools: Record<string, AITool> = {}
+    for (const item of input.tools) {
+      tools[item.id] = tool({
+        description: item.description,
+        inputSchema: zodSchema(item.parameters),
+        async execute(args, options) {
+          const ctx: Tool.Context = {
+            sessionID: input.sessionID,
+            messageID: input.messageID,
+            agent: input.agent,
+            abort: input.abort,
+            callID: options.toolCallId,
+            messages: input.history,
+            metadata: async () => { },
+            ask: Permission.ask,
+          }
+          return item.execute(args, ctx)
+        },
+      })
+    }
+
+    const system = input.system?.filter(Boolean).join("\n")
+
+    return streamText({
+      model,
+      abortSignal: input.abort,
+      messages: input.messages,
+      ...(system ? { system } : {}),
+      tools,
+    })
+  }
+
+  export async function generate(prompt: string) {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+      throw new Error("OPENAI_API_KEY is not set")
+    }
+
+    const provider = createOpenAI({
+      apiKey,
+      baseURL: process.env.OPENAI_BASE_URL,
+    })
+    const model = provider("gpt-4o-mini")
+
+    const result = await generateText({
+      model,
+      prompt,
+    })
+
+    return result.text
+  }
 }
+
+export const generate = (prompt: string) => LLM.generate(prompt)

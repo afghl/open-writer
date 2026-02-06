@@ -1,0 +1,23 @@
+{
+  "id": "part_1770403465165_5",
+  "sessionID": "session_1770403458648_1",
+  "messageID": "message_1770403458650_4",
+  "type": "tool",
+  "callID": "call_hWbThhK8wmZ7czw6tpTJZaOE",
+  "tool": "get_weather",
+  "state": {
+    "status": "completed",
+    "input": {
+      "location": "北京"
+    },
+    "output": "Weather in 北京: Sunny, 23°C, light breeze.",
+    "title": "Weather for 北京",
+    "metadata": {
+      "source": "mock"
+    },
+    "time": {
+      "start": 1770403465271,
+      "end": 1770403465271
+    }
+  }
+}
