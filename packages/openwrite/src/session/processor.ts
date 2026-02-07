@@ -4,6 +4,7 @@ import { Message } from "@/session/message"
 import type { Tool } from "@/tool/tool"
 import { LLM } from "@/session/llm"
 import type { ModelMessage } from "ai"
+import { Log } from "@/util/log"
 
 type CreateInput = {
   assistantMessage: Message.Assistant
@@ -25,6 +26,147 @@ export namespace SessionProcessor {
         return input.assistantMessage
       },
       async process() {
+        const consumeStream = async (streamInput: AsyncIterable<any>, allowTools: boolean) => {
+          for await (const value of streamInput) {
+            Log.Default.info("Stream value", { value })
+            switch (value.type) {
+              case "text-start": {
+                currentText = {
+                  id: Identifier.ascending("part"),
+                  sessionID: input.sessionID,
+                  messageID: input.assistantMessage.id,
+                  type: "text",
+                  text: "",
+                  time: { start: Date.now() },
+                }
+                break
+              }
+              case "text-delta": {
+                if (!currentText) {
+                  currentText = {
+                    id: Identifier.ascending("part"),
+                    sessionID: input.sessionID,
+                    messageID: input.assistantMessage.id,
+                    type: "text",
+                    text: "",
+                    time: { start: Date.now() },
+                  }
+                }
+                currentText.text += value.text
+                await Session.updatePart(currentText)
+                break
+              }
+              case "text-end": {
+                if (currentText) {
+                  currentText.time = { start: currentText.time?.start ?? Date.now(), end: Date.now() }
+                  await Session.updatePart(currentText)
+                }
+                currentText = undefined
+                break
+              }
+              case "tool-input-start": {
+                if (!allowTools) break
+                if (!toolcalls.has(value.id)) {
+                  const part: Message.ToolPart = {
+                    id: Identifier.ascending("part"),
+                    sessionID: input.sessionID,
+                    messageID: input.assistantMessage.id,
+                    type: "tool",
+                    callID: value.id,
+                    tool: value.toolName,
+                    state: {
+                      status: "pending",
+                      input: {},
+                      raw: "",
+                    },
+                  }
+                  toolcalls.set(value.id, part)
+                  await Session.updatePart(part)
+                }
+                break
+              }
+              case "tool-call": {
+                if (!allowTools) break
+                const part: Message.ToolPart = {
+                  id: toolcalls.get(value.toolCallId)?.id ?? Identifier.ascending("part"),
+                  sessionID: input.sessionID,
+                  messageID: input.assistantMessage.id,
+                  type: "tool",
+                  callID: value.toolCallId,
+                  tool: value.toolName,
+                  state: {
+                    status: "running",
+                    input: value.input ?? {},
+                    time: { start: Date.now() },
+                  },
+                }
+                toolcalls.set(value.toolCallId, part)
+                await Session.updatePart(part)
+                break
+              }
+              case "tool-result": {
+                if (!allowTools) break
+                const match = toolcalls.get(value.toolCallId)
+                if (!match) break
+                const outputPayload = value.output ?? {}
+                const output =
+                  typeof outputPayload === "string"
+                    ? outputPayload
+                    : typeof outputPayload.output === "string"
+                      ? outputPayload.output
+                      : JSON.stringify(outputPayload)
+                const completed: Message.ToolPart = {
+                  ...match,
+                  state: {
+                    status: "completed",
+                    input: value.input ?? match.state.input,
+                    output,
+                    title: outputPayload.title ?? match.tool,
+                    metadata: outputPayload.metadata ?? {},
+                    time: {
+                      start: match.state.status === "running" ? match.state.time.start : Date.now(),
+                      end: Date.now(),
+                    },
+                  },
+                }
+                await Session.updatePart(completed)
+                toolcalls.delete(value.toolCallId)
+                break
+              }
+              case "tool-error": {
+                if (!allowTools) break
+                const match = toolcalls.get(value.toolCallId)
+                if (!match) break
+                const failed: Message.ToolPart = {
+                  ...match,
+                  state: {
+                    status: "error",
+                    input: value.input ?? match.state.input,
+                    error: String(value.error ?? "Tool execution failed"),
+                    time: {
+                      start: match.state.status === "running" ? match.state.time.start : Date.now(),
+                      end: Date.now(),
+                    },
+                  },
+                }
+                await Session.updatePart(failed)
+                toolcalls.delete(value.toolCallId)
+                break
+              }
+              case "finish": {
+                input.assistantMessage.time.completed = Date.now()
+                await Session.updateMessage(input.assistantMessage)
+                break
+              }
+              case "error": {
+                throw value.error
+              }
+              default:
+                break
+            }
+          }
+        }
+
         const stream = await LLM.stream({
           sessionID: input.sessionID,
           user: input.user,
@@ -37,139 +179,33 @@ export namespace SessionProcessor {
           system: [],
         })
 
-        for await (const value of stream.fullStream as AsyncIterable<any>) {
-          switch (value.type) {
-            case "text-start": {
-              currentText = {
-                id: Identifier.ascending("part"),
-                sessionID: input.sessionID,
-                messageID: input.assistantMessage.id,
-                type: "text",
-                text: "",
-                time: { start: Date.now() },
-              }
-              break
-            }
-            case "text-delta": {
-              if (!currentText) {
-                currentText = {
-                  id: Identifier.ascending("part"),
-                  sessionID: input.sessionID,
-                  messageID: input.assistantMessage.id,
-                  type: "text",
-                  text: "",
-                  time: { start: Date.now() },
-                }
-              }
-              currentText.text += value.text
-              await Session.updatePart(currentText)
-              break
-            }
-            case "text-end": {
-              if (currentText) {
-                currentText.time = { start: currentText.time?.start ?? Date.now(), end: Date.now() }
-                await Session.updatePart(currentText)
-              }
-              currentText = undefined
-              break
-            }
-            case "tool-input-start": {
-              if (!toolcalls.has(value.id)) {
-                const part: Message.ToolPart = {
-                  id: Identifier.ascending("part"),
-                  sessionID: input.sessionID,
-                  messageID: input.assistantMessage.id,
-                  type: "tool",
-                  callID: value.id,
-                  tool: value.toolName,
-                  state: {
-                    status: "pending",
-                    input: {},
-                    raw: "",
-                  },
-                }
-                toolcalls.set(value.id, part)
-                await Session.updatePart(part)
-              }
-              break
-            }
-            case "tool-call": {
-              const part: Message.ToolPart = {
-                id: toolcalls.get(value.toolCallId)?.id ?? Identifier.ascending("part"),
-                sessionID: input.sessionID,
-                messageID: input.assistantMessage.id,
-                type: "tool",
-                callID: value.toolCallId,
-                tool: value.toolName,
-                state: {
-                  status: "running",
-                  input: value.input ?? {},
-                  time: { start: Date.now() },
-                },
-              }
-              toolcalls.set(value.toolCallId, part)
-              await Session.updatePart(part)
-              break
-            }
-            case "tool-result": {
-              const match = toolcalls.get(value.toolCallId)
-              if (!match) break
-              const outputPayload = value.output ?? {}
-              const output =
-                typeof outputPayload === "string"
-                  ? outputPayload
-                  : typeof outputPayload.output === "string"
-                    ? outputPayload.output
-                    : JSON.stringify(outputPayload)
-              const completed: Message.ToolPart = {
-                ...match,
-                state: {
-                  status: "completed",
-                  input: value.input ?? match.state.input,
-                  output,
-                  title: outputPayload.title ?? match.tool,
-                  metadata: outputPayload.metadata ?? {},
-                  time: {
-                    start: match.state.status === "running" ? match.state.time.start : Date.now(),
-                    end: Date.now(),
-                  },
-                },
-              }
-              await Session.updatePart(completed)
-              toolcalls.delete(value.toolCallId)
-              break
-            }
-            case "tool-error": {
-              const match = toolcalls.get(value.toolCallId)
-              if (!match) break
-              const failed: Message.ToolPart = {
-                ...match,
-                state: {
-                  status: "error",
-                  input: value.input ?? match.state.input,
-                  error: String(value.error ?? "Tool execution failed"),
-                  time: {
-                    start: match.state.status === "running" ? match.state.time.start : Date.now(),
-                    end: Date.now(),
-                  },
-                },
-              }
-              await Session.updatePart(failed)
-              toolcalls.delete(value.toolCallId)
-              break
-            }
-            case "finish": {
-              input.assistantMessage.time.completed = Date.now()
-              await Session.updateMessage(input.assistantMessage)
-              break
-            }
-            case "error": {
-              throw value.error
-            }
-            default:
-              break
-          }
-        }
+        await consumeStream(stream.fullStream as AsyncIterable<any>, true)
+
+        // if (!producedText && toolOutputs.length > 0) {
+        //   const followupMessages = [
+        //     ...input.messages,
+        //     {
+        //       role: "assistant" as const,
+        //       content: `Tool result:\n${toolOutputs.join("\n\n")}`,
+        //     },
+        //     {
+        //       role: "user" as const,
+        //       content: "Provide a concise response based on the tool result.",
+        //     },
+        //   ]
+        //   const followup = await LLM.stream({
+        //     sessionID: input.sessionID,
+        //     user: input.user,
+        //     agent: input.user.agent,
+        //     messageID: input.assistantMessage.id,
+        //     messages: followupMessages,
+        //     tools: input.tools,
+        //     history: input.history,
+        //     abort: input.abort,
+        //     system: [],
+        //   })
+        //   await consumeStream(followup.fullStream as AsyncIterable<any>, false)
+        // }
 
         if (currentText) {
           currentText.time = { start: currentText.time?.start ?? Date.now(), end: Date.now() }

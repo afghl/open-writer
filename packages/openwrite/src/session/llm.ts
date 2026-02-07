@@ -4,6 +4,7 @@ import type { ModelMessage, Tool as AITool } from "ai"
 import type { Message } from "@/session/message"
 import type { Tool } from "@/tool/tool"
 import { Permission } from "@/permission/permission"
+import { Log } from "@/util/log"
 
 export namespace LLM {
   export type StreamInput = {
@@ -53,34 +54,15 @@ export namespace LLM {
 
     const system = input.system?.filter(Boolean).join("\n")
 
-    return streamText({
+    const result = await streamText({
       model,
       abortSignal: input.abort,
       messages: input.messages,
       ...(system ? { system } : {}),
       tools,
     })
+    Log.Default.info("Stream result", { result })
+    return result
   }
 
-  export async function generate(prompt: string) {
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
-      throw new Error("OPENAI_API_KEY is not set")
-    }
-
-    const provider = createOpenAI({
-      apiKey,
-      baseURL: process.env.OPENAI_BASE_URL,
-    })
-    const model = provider("gpt-4o-mini")
-
-    const result = await generateText({
-      model,
-      prompt,
-    })
-
-    return result.text
-  }
 }
-
-export const generate = (prompt: string) => LLM.generate(prompt)

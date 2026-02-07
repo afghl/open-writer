@@ -4,6 +4,11 @@
   "workspaces": {
     "": {
       "name": "open-write",
+      "dependencies": {
+        "@ai-sdk/openai": "catalog:",
+        "ai": "catalog:",
+        "zod": "catalog:",
+      },
       "devDependencies": {
         "@tsconfig/bun": "catalog:",
         "@types/bun": "catalog:",

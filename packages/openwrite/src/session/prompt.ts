@@ -4,6 +4,7 @@ import { Session } from "@/session"
 import { Message } from "@/session/message"
 import { ToolRegistry } from "@/tool/registry"
 import { SessionProcessor } from "@/session/processor"
+import { Log } from "@/util/log"
 
 export namespace SessionPrompt {
   export const PromptInput = z.object({
@@ -37,7 +38,7 @@ export namespace SessionPrompt {
       },
     }
     await Session.updateMessage(assistant)
-
+    Log.Default.info("Assistant message created", { assistant })
     const processor = SessionProcessor.create({
       assistantMessage: assistant,
       sessionID,
@@ -47,7 +48,9 @@ export namespace SessionPrompt {
       messages: Message.toModelMessages(messages),
       abort: new AbortController().signal,
     })
-    return processor.process()
+    const processResult = await processor.process()
+    Log.Default.info("Processor result", { processResult })
+    return processResult
   }
 
   async function createUserMessage(input: PromptInput): Promise<Message.WithParts> {

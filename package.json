@@ -23,6 +23,11 @@
     "dev": "bun run --cwd packages/openwrite dev",
     "typecheck": "bun run --cwd packages/openwrite typecheck"
   },
+  "dependencies": {
+    "@ai-sdk/openai": "catalog:",
+    "ai": "catalog:",
+    "zod": "catalog:"
+  },
   "devDependencies": {
     "@tsconfig/bun": "catalog:",
     "@types/bun": "catalog:",

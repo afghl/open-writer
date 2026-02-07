@@ -2,6 +2,9 @@ import { z } from "zod"
 import { Identifier } from "@/id/id"
 import { Storage } from "@/storage/storage"
 import { Message } from "./message"
+import { Log } from "@/util/log"
+
+const log = Log.create({ service: "session" })
 
 export namespace Session {
   export const Info = z.object({
