@@ -5,7 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai';
 
 const provider = createOpenAI({
     apiKey: process.env.OPENAI_API_KEY,
-    baseURL: process.env.OPENAI_BASE_URL,
+    baseURL: "https://aihubmix.com/v1",
 })
 
 async function generate() {
@@ -28,14 +28,14 @@ async function generate() {
                 },
             }),
         },
-        stopWhen: stepCountIs(5),
+        stopWhen: stepCountIs(1),
         prompt: 'What is the weather in San Francisco?',
     })
     console.log(rsp.text)
 }
 
 async function stream() {
-    const model = provider("o1")
+    const model = provider("gpt-5")
     const rsp = await streamText({
         model: model,
 
@@ -54,7 +54,7 @@ async function stream() {
                 },
             }),
         },
-        stopWhen: stepCountIs(5),
+        // stopWhen: stepCountIs(1),
         providerOptions: {
             openai: {
                 reasoningEffort: "high", // none | minimal | low | medium | high | xhigh

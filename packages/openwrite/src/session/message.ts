@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { ModelMessage } from "ai"
+import { convertToModelMessages, type ModelMessage, type UIMessage } from "ai"
 
 export namespace Message {
   const PartBase = z.object({
@@ -131,6 +131,9 @@ export namespace Message {
       created: z.number(),
       completed: z.number().optional(),
     }),
+    finish: z
+      .enum(["other", "length", "unknown", "error", "stop", "content-filter", "tool-calls"])
+      .optional(),
   }).meta({ ref: "AssistantMessage" })
   export type Assistant = z.infer<typeof Assistant>
 
@@ -144,19 +147,117 @@ export namespace Message {
   export type WithParts = z.infer<typeof WithParts>
 
   export function toModelMessages(input: WithParts[]): ModelMessage[] {
-    const result: ModelMessage[] = []
+    const result: UIMessage[] = []
+    const toolNames = new Set<string>()
+
+    const toModelOutput = (output: unknown) => {
+      if (typeof output === "string") {
+        return { type: "text", value: output }
+      }
+
+      return { type: "json", value: output as never }
+    }
+
     for (const msg of input) {
-      const texts = msg.parts
-        .filter((part) => part.type === "text" && !(part.synthetic ?? false))
-        .map((part) => (part as TextPart).text)
-        .filter((text) => text.trim().length > 0)
-      if (texts.length === 0) continue
+      if (msg.parts.length === 0) continue
+
       if (msg.info.role === "user") {
-        result.push({ role: "user", content: texts.join("\n") })
-      } else {
-        result.push({ role: "assistant", content: texts.join("\n") })
+        const userMessage: UIMessage = {
+          id: msg.info.id,
+          role: "user",
+          parts: [],
+        }
+        for (const part of msg.parts) {
+          if (part.type !== "text") continue
+          if (part.synthetic ?? false) continue
+          if (part.text.trim().length === 0) continue
+          userMessage.parts.push({
+            type: "text",
+            text: part.text,
+          })
+        }
+        if (userMessage.parts.length > 0) {
+          result.push(userMessage)
+        }
+      }
+
+      if (msg.info.role === "assistant") {
+        const assistantMessage: UIMessage = {
+          id: msg.info.id,
+          role: "assistant",
+          parts: [],
+        }
+        for (const part of msg.parts) {
+          if (part.type === "text") {
+            if (part.synthetic ?? false) continue
+            if (part.text.trim().length === 0) continue
+            assistantMessage.parts.push({
+              type: "text",
+              text: part.text,
+              providerMetadata: part.metadata,
+            })
+          }
+          if (part.type === "step-start") {
+            assistantMessage.parts.push({
+              type: "step-start",
+            })
+          }
+          if (part.type === "tool") {
+            toolNames.add(part.tool)
+            if (part.state.status === "completed") {
+              assistantMessage.parts.push({
+                type: ("tool-" + part.tool) as `tool-${string}`,
+                state: "output-available",
+                toolCallId: part.callID,
+                input: part.state.input,
+                output: part.state.output,
+                callProviderMetadata: part.metadata,
+              })
+            }
+            if (part.state.status === "error") {
+              assistantMessage.parts.push({
+                type: ("tool-" + part.tool) as `tool-${string}`,
+                state: "output-error",
+                toolCallId: part.callID,
+                input: part.state.input,
+                errorText: part.state.error,
+                callProviderMetadata: part.metadata,
+              })
+            }
+            if (part.state.status === "pending" || part.state.status === "running") {
+              assistantMessage.parts.push({
+                type: ("tool-" + part.tool) as `tool-${string}`,
+                state: "output-error",
+                toolCallId: part.callID,
+                input: part.state.input,
+                errorText: "[Tool execution was interrupted]",
+                callProviderMetadata: part.metadata,
+              })
+            }
+          }
+          if (part.type === "reasoning") {
+            if (part.text.trim().length === 0) continue
+            assistantMessage.parts.push({
+              type: "reasoning",
+              text: part.text,
+              providerMetadata: part.metadata,
+            })
+          }
+        }
+        if (assistantMessage.parts.length > 0) {
+          result.push(assistantMessage)
+        }
       }
     }
-    return result
+
+    const tools = Object.fromEntries(Array.from(toolNames).map((toolName) => [toolName, { toModelOutput }]))
+
+    return convertToModelMessages(
+      result.filter((msg) => msg.parts.some((part) => part.type !== "step-start")),
+      {
+        // @ts-expect-error convertToModelMessages expects a ToolSet, only uses tools[name]?.toModelOutput
+        tools,
+      },
+    )
   }
 }

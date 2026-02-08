@@ -4,9 +4,23 @@ import { Session } from "@/session"
 import { Message } from "@/session/message"
 import { ToolRegistry } from "@/tool/registry"
 import { SessionProcessor } from "@/session/processor"
+import { LLM } from "@/session/llm"
 import { Log } from "@/util/log"
+import { finished } from "stream"
 
 export namespace SessionPrompt {
+  const MAX_STEPS = 4
+  const busyState = new Map<
+    string,
+    {
+      abort: AbortController
+      callbacks: Array<{
+        resolve(input: Message.WithParts): void
+        reject(reason?: unknown): void
+      }>
+    }
+  >()
+
   export const PromptInput = z.object({
     sessionID: z.string(),
     text: z.string().min(1),
@@ -14,43 +28,139 @@ export namespace SessionPrompt {
   })
   export type PromptInput = z.infer<typeof PromptInput>
 
+  export function assertNotBusy(sessionID: string) {
+    if (busyState.has(sessionID)) {
+      throw new Error(`Session ${sessionID} is busy`)
+    }
+  }
+
+  function start(sessionID: string) {
+    if (busyState.has(sessionID)) return undefined
+    const controller = new AbortController()
+    busyState.set(sessionID, { abort: controller, callbacks: [] })
+    return controller.signal
+  }
+
+  export function cancel(sessionID: string) {
+    const entry = busyState.get(sessionID)
+    if (!entry) return
+    entry.abort.abort()
+    for (const callback of entry.callbacks) {
+      callback.reject(new DOMException("Aborted", "AbortError"))
+    }
+    busyState.delete(sessionID)
+  }
+
   export async function prompt(input: PromptInput) {
     const message = await createUserMessage(input)
     return loop(message.info.sessionID)
   }
 
   export async function loop(sessionID: string) {
-    const messages = await Session.messages({ sessionID })
-    const lastUser = [...messages].reverse().find((msg) => msg.info.role === "user")
-    if (!lastUser || lastUser.info.role !== "user") {
-      throw new Error("No user message found in session.")
+    const abort = start(sessionID)
+    if (!abort) {
+      return new Promise<Message.WithParts>((resolve, reject) => {
+        busyState.get(sessionID)?.callbacks.push({ resolve, reject })
+      })
     }
 
-    const tools = await ToolRegistry.tools()
-    const assistant: Message.Assistant = {
-      id: Identifier.ascending("message"),
-      role: "assistant",
-      sessionID,
-      parentID: lastUser.info.id,
-      agent: lastUser.info.agent,
-      time: {
-        created: Date.now(),
-      },
+    let lastResult: Message.WithParts | undefined
+    let error: unknown
+    let step = 0
+
+    try {
+      while (true) {
+        if (abort.aborted) {
+          throw new DOMException("Aborted", "AbortError")
+        }
+
+        const messages = await Session.messages({ sessionID })
+        const lastUser = [...messages].reverse().find((msg) => msg.info.role === "user")
+        if (!lastUser || lastUser.info.role !== "user") {
+          throw new Error("No user message found in session.")
+        }
+        Log.Default.info("message count", { cnt: messages.length })
+
+        const lastAssistant = [...messages].reverse().find((msg) => msg.info.role === "assistant")
+        Log.Default.info("Last assistant message", {
+          lastAssistant,
+          parentIdEqual: lastAssistant?.info.role === "assistant" && lastAssistant.info.parentID === lastUser.info.id,
+          idGreater: lastAssistant?.info.id > lastUser.info.id,
+          finishReason: lastAssistant?.info.finish,
+        })
+        if (lastAssistant && lastAssistant.info.role === "assistant") {
+          const hasPendingTool = messageHasPendingTool(lastAssistant)
+          Log.Default.info("Has pending tool", { hasPendingTool })
+          if (hasPendingTool) {
+            lastResult = lastAssistant
+            break
+          }
+
+          if (
+            isAssistantFinished(lastAssistant) &&
+            lastAssistant.info.parentID === lastUser.info.id &&
+            lastAssistant.info.id > lastUser.info.id
+          ) {
+            lastResult = lastAssistant
+            break
+          }
+        }
+
+        if (step >= MAX_STEPS) {
+          Log.Default.warn("Max steps reached in session loop", { sessionID, step })
+          break
+        }
+        step += 1
+
+        const tools = await ToolRegistry.tools()
+        const assistant: Message.Assistant = {
+          id: Identifier.ascending("message"),
+          role: "assistant",
+          sessionID,
+          parentID: lastUser.info.id,
+          agent: lastUser.info.agent,
+          time: {
+            created: Date.now(),
+          },
+        }
+        await Session.updateMessage(assistant)
+        const modelMessage = Message.toModelMessages(messages)
+        Log.Default.info("model message..", { messages, modelMessage })
+        const processor = SessionProcessor.create({
+          assistantMessage: assistant,
+          sessionID,
+          user: lastUser.info,
+          history: messages,
+          tools,
+          messages: modelMessage,
+          abort,
+        })
+        lastResult = await processor.process()
+        await ensureTitleIfNeeded(sessionID, messages, lastResult)
+      }
+    } catch (caught) {
+      error = caught
+      throw caught
+    } finally {
+      const entry = busyState.get(sessionID)
+      if (entry) {
+        if (error) {
+          for (const callback of entry.callbacks) {
+            callback.reject(error)
+          }
+        } else if (lastResult) {
+          for (const callback of entry.callbacks) {
+            callback.resolve(lastResult)
+          }
+        }
+        busyState.delete(sessionID)
+      }
     }
-    await Session.updateMessage(assistant)
-    Log.Default.info("Assistant message created", { assistant })
-    const processor = SessionProcessor.create({
-      assistantMessage: assistant,
-      sessionID,
-      user: lastUser.info,
-      history: messages,
-      tools,
-      messages: Message.toModelMessages(messages),
-      abort: new AbortController().signal,
-    })
-    const processResult = await processor.process()
-    Log.Default.info("Processor result", { processResult })
-    return processResult
+
+    if (!lastResult) {
+      throw new Error("No assistant message generated.")
+    }
+    return lastResult
   }
 
   async function createUserMessage(input: PromptInput): Promise<Message.WithParts> {
@@ -75,5 +185,74 @@ export namespace SessionPrompt {
     await Session.updateMessage(info)
     await Session.updatePart(part)
     return { info, parts: [part] }
+  }
+
+  function isDefaultTitle(title: string) {
+    return title.startsWith("New session - ")
+  }
+
+  async function ensureTitleIfNeeded(
+    sessionID: string,
+    history: Message.WithParts[],
+    lastResult?: Message.WithParts,
+  ) {
+    if (!lastResult || lastResult.info.role !== "assistant" || !lastResult.info.time.completed) return
+    const session = await Session.get(sessionID)
+    if (!session || !isDefaultTitle(session.title)) return
+
+    const firstRealUserIndex = history.findIndex(
+      (msg) =>
+        msg.info.role === "user" &&
+        msg.parts.some((part) => part.type === "text" && part.text.trim().length > 0),
+    )
+    if (firstRealUserIndex === -1) return
+
+    const firstUser = history[firstRealUserIndex].info as Message.User
+    try {
+      const result = await LLM.stream({
+        sessionID,
+        user: firstUser,
+        agent: firstUser.agent,
+        messageID: lastResult.info.id,
+        messages: [
+          { role: "user", content: "Generate a concise title for this conversation:" },
+          ...Message.toModelMessages(history.slice(0, firstRealUserIndex + 1)),
+        ],
+        tools: [],
+        history,
+        abort: new AbortController().signal,
+        system: [],
+      })
+      const text = await result.text
+      const cleaned = text
+        .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+        .split("\n")
+        .map((line) => line.trim())
+        .find((line) => line.length > 0)
+      if (!cleaned) return
+      const title = cleaned.length > 100 ? `${cleaned.slice(0, 97)}...` : cleaned
+      await Session.update(sessionID, (draft) => {
+        draft.title = title
+      })
+    } catch (error) {
+      Log.Default.warn("Failed to generate session title", { sessionID, error })
+    }
+  }
+
+  function isAssistantFinished(message: Message.WithParts) {
+    if (message.info.role !== "assistant") return false
+    if (!message.info.time.completed) return false
+    if (message.info.finish) {
+      return !["tool-calls", "unknown"].includes(message.info.finish)
+    }
+    return !messageHasPendingTool(message)
+  }
+
+  function messageHasPendingTool(message: Message.WithParts) {
+    return message.parts.some(
+      (part) =>
+        part.type === "tool" &&
+        (part.state.status === "pending" || part.state.status === "running"),
+    )
   }
 }

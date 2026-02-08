@@ -43,7 +43,7 @@ export namespace Tool {
   ): Info<Parameters, Result> {
     return {
       id,
-      init: async (initCtx) => {
+      init: async (initCtx: Tool.InitContext) => {
         const toolInfo = init instanceof Function ? await init(initCtx) : init
         const execute = toolInfo.execute
         toolInfo.execute = async (args, ctx) => {

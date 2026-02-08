@@ -21,6 +21,7 @@
   },
   "scripts": {
     "dev": "bun run --cwd packages/openwrite dev",
+    "test": "bun run --cwd packages/openwrite test",
     "typecheck": "bun run --cwd packages/openwrite typecheck"
   },
   "dependencies": {

@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai"
-import { generateText, streamText, tool, zodSchema } from "ai"
+import { generateText, streamText, tool, zodSchema, stepCountIs } from "ai"
 import type { ModelMessage, Tool as AITool } from "ai"
 import type { Message } from "@/session/message"
 import type { Tool } from "@/tool/tool"
@@ -7,6 +7,7 @@ import { Permission } from "@/permission/permission"
 import { Log } from "@/util/log"
 
 export namespace LLM {
+
   export type StreamInput = {
     sessionID: string
     user: Message.User
@@ -18,13 +19,15 @@ export namespace LLM {
     abort: AbortSignal
     system?: string[]
   }
-
   export async function stream(input: StreamInput) {
+    const log = Log.create({
+      service: "llm.stream", sessionID: input.sessionID,
+      messageID: input.messageID,
+    })
     const apiKey = process.env.OPENAI_API_KEY
     if (!apiKey) {
       throw new Error("OPENAI_API_KEY is not set")
     }
-
     const provider = createOpenAI({
       apiKey,
       baseURL: process.env.OPENAI_BASE_URL,
@@ -53,16 +56,17 @@ export namespace LLM {
     }
 
     const system = input.system?.filter(Boolean).join("\n")
-
-    const result = await streamText({
+    const req = {
       model,
       abortSignal: input.abort,
       messages: input.messages,
       ...(system ? { system } : {}),
       tools,
+    }
+    log.info("call llm request. ", {
+      messages: req.messages, system: req.system, model: req.model,
     })
-    Log.Default.info("Stream result", { result })
+    const result = await streamText(req)
     return result
   }
-
 }
