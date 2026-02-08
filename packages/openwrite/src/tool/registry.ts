@@ -1,6 +1,9 @@
 import type { Agent } from "@/agent/types"
 import type { Tool } from "./tool"
 import { GetWeatherTool } from "./get_weather"
+import { ReadTool } from "./read"
+import { EditTool } from "./edit"
+import { BashTool } from "./bash"
 
 export namespace ToolRegistry {
   const custom = new Map<string, Tool.Info>()
@@ -22,7 +25,7 @@ export namespace ToolRegistry {
   }
 
   export async function tools(agent?: Agent) {
-    const builtins = [GetWeatherTool]
+    const builtins = [ReadTool, EditTool, BashTool]
     const filtered = filterTools([...builtins, ...custom.values()], agent)
     const result = await Promise.all(
       filtered.map(async (t) => ({
