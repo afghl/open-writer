@@ -1,6 +1,7 @@
 import { createOpenAI } from "@ai-sdk/openai"
 import { generateText, streamText, tool, zodSchema, stepCountIs } from "ai"
 import type { ModelMessage, Tool as AITool } from "ai"
+import type { Agent } from "@/agent/types"
 import type { Message } from "@/session/message"
 import type { Tool } from "@/tool/tool"
 import { Permission } from "@/permission/permission"
@@ -11,13 +12,13 @@ export namespace LLM {
   export type StreamInput = {
     sessionID: string
     user: Message.User
-    agent: string
     messageID: string
     messages: ModelMessage[]
     tools: Array<Awaited<ReturnType<Tool.Info["init"]>> & { id: string }>
     history: Message.WithParts[]
     abort: AbortSignal
     system?: string[]
+    agentRef?: Agent
   }
   export async function stream(input: StreamInput) {
     const log = Log.create({
@@ -32,7 +33,18 @@ export namespace LLM {
       apiKey,
       baseURL: process.env.OPENAI_BASE_URL,
     })
-    const model = provider("gpt-4o-mini")
+    const agentInfo = input.agentRef?.Info()
+    let modelID = "gpt-4o-mini"
+    if (agentInfo?.model) {
+      if (agentInfo.model.providerID !== "openai") {
+        log.warn("Unsupported provider for agent model", {
+          providerID: agentInfo.model.providerID,
+        })
+      } else {
+        modelID = agentInfo.model.modelID
+      }
+    }
+    const model = provider(modelID)
 
     const tools: Record<string, AITool> = {}
     for (const item of input.tools) {
@@ -43,7 +55,7 @@ export namespace LLM {
           const ctx: Tool.Context = {
             sessionID: input.sessionID,
             messageID: input.messageID,
-            agent: input.agent,
+            agent: agentInfo?.name,
             abort: input.abort,
             callID: options.toolCallId,
             messages: input.history,
@@ -55,11 +67,23 @@ export namespace LLM {
       })
     }
 
-    const system = input.system?.filter(Boolean).join("\n")
+    const system = [
+      agentInfo?.prompt,
+      ...(input.system ?? []),
+    ]
+      .filter(Boolean)
+      .join("\n")
+    log.info("system", { system, agentInfo })
     const req = {
       model,
       abortSignal: input.abort,
       messages: input.messages,
+      ...(agentInfo?.temperature !== undefined
+        ? { temperature: agentInfo.temperature }
+        : {}),
+      ...(agentInfo?.topP !== undefined
+        ? { topP: agentInfo.topP }
+        : {}),
       ...(system ? { system } : {}),
       tools,
     }

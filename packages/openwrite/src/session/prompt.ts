@@ -5,6 +5,7 @@ import { Message } from "@/session/message"
 import { ToolRegistry } from "@/tool/registry"
 import { SessionProcessor } from "@/session/processor"
 import { LLM } from "@/session/llm"
+import { agentRegistry } from "@/agent/registry"
 import { Log } from "@/util/log"
 import { finished } from "stream"
 
@@ -52,7 +53,12 @@ export namespace SessionPrompt {
   }
 
   export async function prompt(input: PromptInput) {
-    const message = await createUserMessage(input)
+    const agent = agentRegistry.resolve(input.agent)
+    const agentInfo = agent.Info()
+    const message = await createUserMessage({
+      ...input,
+      agent: agentInfo.name,
+    })
     return loop(message.info.sessionID)
   }
 
@@ -82,12 +88,6 @@ export namespace SessionPrompt {
         Log.Default.info("message count", { cnt: messages.length })
 
         const lastAssistant = [...messages].reverse().find((msg) => msg.info.role === "assistant")
-        Log.Default.info("Last assistant message", {
-          lastAssistant,
-          parentIdEqual: lastAssistant?.info.role === "assistant" && lastAssistant.info.parentID === lastUser.info.id,
-          idGreater: lastAssistant?.info.id > lastUser.info.id,
-          finishReason: lastAssistant?.info.finish,
-        })
         if (lastAssistant && lastAssistant.info.role === "assistant") {
           const hasPendingTool = messageHasPendingTool(lastAssistant)
           Log.Default.info("Has pending tool", { hasPendingTool })
@@ -106,19 +106,22 @@ export namespace SessionPrompt {
           }
         }
 
-        if (step >= MAX_STEPS) {
+        const agent = agentRegistry.resolve(lastUser.info.agent)
+        const agentInfo = agent.Info()
+        const maxSteps = agentInfo.steps ?? MAX_STEPS
+        if (step >= maxSteps) {
           Log.Default.warn("Max steps reached in session loop", { sessionID, step })
           break
         }
         step += 1
 
-        const tools = await ToolRegistry.tools()
+        const tools = await ToolRegistry.tools(agent)
         const assistant: Message.Assistant = {
           id: Identifier.ascending("message"),
           role: "assistant",
           sessionID,
           parentID: lastUser.info.id,
-          agent: lastUser.info.agent,
+          agent: agentInfo.name,
           time: {
             created: Date.now(),
           },
@@ -134,6 +137,7 @@ export namespace SessionPrompt {
           tools,
           messages: modelMessage,
           abort,
+          agentRef: agent,
         })
         lastResult = await processor.process()
         await ensureTitleIfNeeded(sessionID, messages, lastResult)
@@ -168,7 +172,7 @@ export namespace SessionPrompt {
       id: Identifier.ascending("message"),
       role: "user",
       sessionID: input.sessionID,
-      agent: input.agent ?? "build",
+      agent: input.agent,
       time: {
         created: Date.now(),
       },
@@ -209,10 +213,10 @@ export namespace SessionPrompt {
 
     const firstUser = history[firstRealUserIndex].info as Message.User
     try {
+      const agent = agentRegistry.resolve(firstUser.agent)
       const result = await LLM.stream({
         sessionID,
         user: firstUser,
-        agent: firstUser.agent,
         messageID: lastResult.info.id,
         messages: [
           { role: "user", content: "Generate a concise title for this conversation:" },
@@ -222,6 +226,7 @@ export namespace SessionPrompt {
         history,
         abort: new AbortController().signal,
         system: [],
+        agentRef: agent,
       })
       const text = await result.text
       const cleaned = text

@@ -5,6 +5,7 @@ import type { Tool } from "@/tool/tool"
 import { LLM } from "@/session/llm"
 import type { ModelMessage } from "ai"
 import { Log } from "@/util/log"
+import type { Agent } from "@/agent/types"
 
 type CreateInput = {
   assistantMessage: Message.Assistant
@@ -14,6 +15,7 @@ type CreateInput = {
   tools: Array<Awaited<ReturnType<Tool.Info["init"]>> & { id: string }>
   messages: ModelMessage[]
   abort: AbortSignal
+  agentRef?: Agent
 }
 
 export const create = (input: CreateInput) => {
@@ -33,13 +35,12 @@ export const create = (input: CreateInput) => {
       const stream = await LLM.stream({
         sessionID: input.sessionID,
         user: input.user,
-        agent: input.user.agent,
         messageID: input.assistantMessage.id,
         messages: input.messages,
         tools: input.tools,
         history: input.history,
         abort: input.abort,
-        system: [],
+        agentRef: input.agentRef,
       })
 
       for await (const value of stream.fullStream) {
