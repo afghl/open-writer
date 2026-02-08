@@ -73,7 +73,6 @@ export namespace LLM {
     ]
       .filter(Boolean)
       .join("\n")
-    log.info("system", { system, agentInfo })
     const req = {
       model,
       abortSignal: input.abort,
@@ -88,7 +87,7 @@ export namespace LLM {
       tools,
     }
     log.info("call llm request. ", {
-      messages: req.messages, system: req.system, model: req.model,
+      model: req.model, tools: Object.keys(tools),
     })
     const result = await streamText(req)
     return result

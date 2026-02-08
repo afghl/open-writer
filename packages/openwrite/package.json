@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-sdk/openai": "catalog:",
     "ai": "catalog:",
+    "diff": "^8.0.3",
     "hono": "catalog:",
     "zod": "catalog:"
   },

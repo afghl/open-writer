@@ -1,82 +1,87 @@
 import z from "zod"
-import path from "path"
-import fs from "fs/promises"
+import { promises as fs } from "node:fs"
+import path from "node:path"
+import { createTwoFilesPatch, diffLines } from "diff"
 import { Tool } from "./tool"
+import DESCRIPTION from "./edit.txt"
 
-function resolvePath(inputPath: string) {
-  return path.isAbsolute(inputPath) ? inputPath : path.resolve(process.cwd(), inputPath)
-}
+const resolvePath = (filePath: string) =>
+  path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath)
 
-function replaceOnce(content: string, find: string, replaceWith: string) {
-  const index = content.indexOf(find)
-  if (index === -1) return { found: false, result: content }
-  return {
-    found: true,
-    result: content.slice(0, index) + replaceWith + content.slice(index + find.length),
+const diffStats = (before: string, after: string) => {
+  let additions = 0
+  let deletions = 0
+  for (const part of diffLines(before, after)) {
+    if (part.added) additions += part.count ?? 0
+    if (part.removed) deletions += part.count ?? 0
   }
+  return { additions, deletions }
 }
 
-export const EditTool = Tool.define("edit", {
-  description: "Edit a file by replacing a text block.",
+export const EditTool = Tool.define("edit", async () => ({
+  description: DESCRIPTION,
   parameters: z.object({
-    filePath: z.string().describe("The path to the file to modify"),
+    filePath: z.string().min(1).describe("The absolute path to the file to modify"),
     oldString: z.string().describe("The text to replace"),
-    newString: z.string().describe("The text to replace it with"),
-    replaceAll: z.boolean().optional().describe("Replace all occurrences (default false)"),
+    newString: z.string().describe("The text to replace it with (must be different from oldString)"),
+    replaceAll: z.boolean().optional().describe("Replace all occurrences of oldString (default false)"),
   }),
-  async execute(params, ctx) {
-    if (params.oldString === params.newString) {
-      throw new Error("oldString and newString must be different")
-    }
-
-    const filePath = resolvePath(params.filePath)
-    const title = path.relative(process.cwd(), filePath)
-
+  async execute(params, ctx: Tool.Context) {
+    const resolvedPath = resolvePath(params.filePath)
     await ctx.ask({
       permission: "edit",
-      patterns: [filePath],
+      patterns: [resolvedPath],
       always: ["*"],
-      metadata: {},
+      metadata: { filePath: resolvedPath },
     })
 
-    if (params.oldString === "") {
-      await fs.mkdir(path.dirname(filePath), { recursive: true })
-      await fs.writeFile(filePath, params.newString, "utf8")
-      return {
-        title: title || filePath,
-        metadata: { created: true },
-        output: "File written successfully.",
+    let before = ""
+    try {
+      const stat = await fs.stat(resolvedPath)
+      if (!stat.isFile()) {
+        throw new Error(`Path is not a file: ${resolvedPath}`)
+      }
+      before = await fs.readFile(resolvedPath, "utf8")
+    } catch (error) {
+      if (params.oldString !== "") {
+        throw error
       }
     }
 
-    let content
-    try {
-      content = await fs.readFile(filePath, "utf8")
-    } catch {
-      throw new Error(`File not found: ${filePath}`)
-    }
-
-    let result = content
-    let found = false
-    if (params.replaceAll) {
-      found = content.includes(params.oldString)
-      result = content.split(params.oldString).join(params.newString)
+    let after = before
+    if (params.oldString === "") {
+      after = params.newString
     } else {
-      const replaced = replaceOnce(content, params.oldString, params.newString)
-      found = replaced.found
-      result = replaced.result
+      if (!before.includes(params.oldString)) {
+        throw new Error("Old string not found in file.")
+      }
+      after = params.replaceAll
+        ? before.split(params.oldString).join(params.newString)
+        : before.replace(params.oldString, params.newString)
     }
 
-    if (!found) {
-      throw new Error("oldString not found in file.")
-    }
+    await fs.writeFile(resolvedPath, after, "utf8")
 
-    await fs.writeFile(filePath, result, "utf8")
+    const diff = createTwoFilesPatch(
+      resolvedPath,
+      resolvedPath,
+      before,
+      after,
+      "before",
+      "after",
+      { context: 3 },
+    )
+    const stats = diffStats(before, after)
 
     return {
-      title: title || filePath,
-      metadata: { updated: true },
+      title: `Edit ${path.basename(resolvedPath)}`,
+      metadata: {
+        filePath: resolvedPath,
+        diff,
+        additions: stats.additions,
+        deletions: stats.deletions,
+      },
       output: "Edit applied successfully.",
     }
   },
-})
+}))

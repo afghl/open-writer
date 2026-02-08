@@ -1,6 +1,7 @@
 import fs from "fs"
 import path from "path"
 import { GeneralAgent } from "./general"
+import { PlanAgent } from "./plan"
 import type { Agent } from "./types"
 import { Log } from "@/util/log"
 
@@ -16,17 +17,7 @@ export class AgentRegistry {
   }
 
   register(agent: Agent) {
-    Log.Default.info("Registering agent", { agent })
-    const info = agent.Info()
-    if (!info.prompt) {
-      const prompt = this.loadPrompt(info.id)
-      Log.Default.info("Loaded prompt for agent", { agentID: info.id, prompt })
-      if (prompt) {
-        info.prompt = prompt
-        Log.Default.info("Set prompt for agent", { agentID: info.id, prompt })
-      }
-    }
-    this.agents.set(info.id, agent)
+    this.agents.set(agent.Info().id, agent)
   }
 
   get(id: string) {
@@ -54,20 +45,11 @@ export class AgentRegistry {
     }
     return fallback
   }
-
-  private loadPrompt(agentID: string) {
-    Log.Default.info("Loading prompt for agent", { agentID })
-    const promptPath = path.join(process.cwd(), "prompts", "agents", `${agentID}.txt`)
-    Log.Default.info("Prompt path", { promptPath })
-    if (!fs.existsSync(promptPath)) return undefined
-    const text = fs.readFileSync(promptPath, "utf8").trim()
-    Log.Default.info("Loaded prompt for agent", { agentID, promptPath, text })
-    return text.length > 0 ? text : undefined
-  }
 }
 
 const agentRegistry = new AgentRegistry()
 
 agentRegistry.register(new GeneralAgent())
+agentRegistry.register(new PlanAgent())
 
 export { agentRegistry }

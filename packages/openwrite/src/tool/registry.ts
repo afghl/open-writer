@@ -1,6 +1,5 @@
 import type { Agent } from "@/agent/types"
 import type { Tool } from "./tool"
-import { GetWeatherTool } from "./get_weather"
 import { ReadTool } from "./read"
 import { EditTool } from "./edit"
 import { BashTool } from "./bash"

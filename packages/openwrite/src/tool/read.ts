@@ -1,80 +1,88 @@
 import z from "zod"
-import path from "path"
-import fs from "fs/promises"
+import { promises as fs } from "node:fs"
+import path from "node:path"
 import { Tool } from "./tool"
+import DESCRIPTION from "./read.txt"
 
-const DEFAULT_READ_LIMIT = 2000
+const MAX_LINES = 2000
+const MAX_BYTES = 50 * 1024
 
-function resolvePath(inputPath: string) {
-  return path.isAbsolute(inputPath) ? inputPath : path.resolve(process.cwd(), inputPath)
+const resolvePath = (filePath: string) =>
+  path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath)
+
+const formatLines = (lines: string[], offset: number) =>
+  lines
+    .map((line, index) => `${String(offset + index + 1).padStart(5, "0")}|${line}`)
+    .join("\n")
+
+const truncateByBytes = (input: string, maxBytes: number) => {
+  const buffer = Buffer.from(input, "utf8")
+  if (buffer.byteLength <= maxBytes) {
+    return { output: input, truncated: false }
+  }
+  const sliced = buffer.subarray(0, maxBytes).toString("utf8")
+  return { output: sliced, truncated: true }
 }
 
-function isBinaryBuffer(buffer: Buffer) {
-  return buffer.includes(0)
-}
-
-export const ReadTool = Tool.define("read", {
-  description: "Read a file from disk with optional offset and limit.",
+export const ReadTool = Tool.define("read", async () => ({
+  description: DESCRIPTION,
   parameters: z.object({
-    filePath: z.string().describe("The path to the file to read"),
-    offset: z.coerce.number().int().min(0).optional().describe("The line number to start reading from (0-based)"),
-    limit: z.coerce.number().int().min(1).optional().describe("The number of lines to read (default 2000)"),
+    filePath: z
+      .string()
+      .min(1)
+      .describe("The path to the file to read"),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("The line number to start reading from (0-based)"),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe("The number of lines to read (defaults to 2000)"),
   }),
-  async execute(params, ctx) {
-    const filePath = resolvePath(params.filePath)
-    const title = path.relative(process.cwd(), filePath)
-
+  async execute(params, ctx: Tool.Context) {
+    const resolvedPath = resolvePath(params.filePath)
     await ctx.ask({
       permission: "read",
-      patterns: [filePath],
+      patterns: [resolvedPath],
       always: ["*"],
-      metadata: {},
+      metadata: { filePath: resolvedPath },
     })
 
-    let stat
-    try {
-      stat = await fs.stat(filePath)
-    } catch {
-      throw new Error(`File not found: ${filePath}`)
-    }
-    if (stat.isDirectory()) {
-      throw new Error(`Path is a directory, not a file: ${filePath}`)
+    const stat = await fs.stat(resolvedPath)
+    if (!stat.isFile()) {
+      throw new Error(`Path is not a file: ${resolvedPath}`)
     }
 
-    const buffer = await fs.readFile(filePath)
-    if (isBinaryBuffer(buffer)) {
-      throw new Error(`Cannot read binary file: ${filePath}`)
-    }
-
-    const text = buffer.toString("utf8")
-    const lines = text.split("\n")
+    const raw = await fs.readFile(resolvedPath, "utf8")
+    const allLines = raw.split(/\r?\n/)
     const offset = params.offset ?? 0
-    const limit = params.limit ?? DEFAULT_READ_LIMIT
-    const end = Math.min(lines.length, offset + limit)
+    const limit = params.limit ?? MAX_LINES
+    const end = Math.min(allLines.length, offset + limit)
+    const sliced = allLines.slice(offset, end)
+    const formatted = formatLines(sliced, offset)
+    const truncatedByLines = end < allLines.length
+    const truncatedByBytes = truncateByBytes(formatted, MAX_BYTES)
+    const truncated = truncatedByLines || truncatedByBytes.truncated
 
-    const selected = lines.slice(offset, end)
-    const content = selected.map((line, index) => {
-      return `${(index + offset + 1).toString().padStart(5, "0")}| ${line}`
-    })
-    const preview = selected.slice(0, 20).join("\n")
-    const hasMore = lines.length > end
-
-    let output = "<file>\n"
-    output += content.join("\n")
-    if (hasMore) {
-      output += `\n\n(File has more lines. Use 'offset' to read beyond line ${end})`
-    } else {
-      output += `\n\n(End of file - total ${lines.length} lines)`
-    }
-    output += "\n</file>"
+    const footer = truncated
+      ? `\n\n[truncated] showing lines ${offset + 1}-${end} of ${allLines.length}`
+      : ""
 
     return {
-      title: title || filePath,
+      title: `Read ${path.basename(resolvedPath)}`,
       metadata: {
-        preview,
-        truncated: hasMore,
+        filePath: resolvedPath,
+        offset,
+        limit,
+        totalLines: allLines.length,
+        truncated,
       },
-      output,
+      output: truncatedByBytes.output + footer,
     }
   },
-})
+}))

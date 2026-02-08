@@ -1,4 +1,5 @@
 import { BaseAgent, type PermissionRuleset } from "./types"
+import SYSTEM_PROMPT from "./general.txt"
 
 const defaultPermission: PermissionRuleset = {}
 
@@ -7,8 +8,8 @@ export class GeneralAgent extends BaseAgent {
     super({
       id: "general",
       name: "general",
-      description: "General-purpose agent",
-      // prompt: "You always answer questions with humor and sarcasm, reflecting a rich sense of humor.",
+      description: "a general purpose agent",
+      prompt: SYSTEM_PROMPT,
       mode: "primary",
       native: true,
       permission: defaultPermission,

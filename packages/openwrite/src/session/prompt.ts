@@ -10,7 +10,7 @@ import { Log } from "@/util/log"
 import { finished } from "stream"
 
 export namespace SessionPrompt {
-  const MAX_STEPS = 4
+  const MAX_STEPS = 8
   const busyState = new Map<
     string,
     {

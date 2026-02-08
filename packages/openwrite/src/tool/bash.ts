@@ -1,85 +1,104 @@
 import z from "zod"
-import { spawn } from "child_process"
-import path from "path"
+import path from "node:path"
 import { Tool } from "./tool"
+import DESCRIPTION from "./bash.txt"
 
-const DEFAULT_TIMEOUT = 2 * 60 * 1000
-const MAX_OUTPUT_BYTES = 100_000
+const DEFAULT_TIMEOUT = 120_000
+const MAX_LINES = 2000
+const MAX_BYTES = 50 * 1024
 
-function resolveCwd(inputPath?: string) {
-  if (!inputPath) return process.cwd()
-  return path.isAbsolute(inputPath) ? inputPath : path.resolve(process.cwd(), inputPath)
+const resolveDir = (workdir?: string) =>
+  workdir ? (path.isAbsolute(workdir) ? workdir : path.resolve(process.cwd(), workdir)) : process.cwd()
+
+const commandPrefix = (command: string) => {
+  const trimmed = command.trim()
+  if (!trimmed) return command
+  return trimmed.split(/\s+/)[0]
 }
 
-export const BashTool = Tool.define("bash", {
-  description: "Execute a shell command with an optional working directory.",
+export const BashTool = Tool.define("bash", async () => ({
+  description: DESCRIPTION.replaceAll("${directory}", process.cwd())
+    .replaceAll("${maxLines}", String(MAX_LINES))
+    .replaceAll("${maxBytes}", String(MAX_BYTES)),
   parameters: z.object({
     command: z.string().min(1).describe("The command to execute"),
-    timeout: z.number().int().min(1).optional().describe("Optional timeout in milliseconds"),
-    workdir: z.string().optional().describe("Working directory to run the command in"),
+    timeout: z.number().describe("Optional timeout in milliseconds").optional(),
+    workdir: z
+      .string()
+      .describe(
+        `The working directory to run the command in. Defaults to ${process.cwd()}. Use this instead of 'cd' commands.`,
+      )
+      .optional(),
     description: z
       .string()
-      .min(1)
-      .describe("Clear, concise description of what this command does in 5-10 words"),
+      .describe(
+        "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'",
+      ),
   }),
-  async execute(params, ctx) {
-    const cwd = resolveCwd(params.workdir)
-    const timeout = params.timeout ?? DEFAULT_TIMEOUT
-
+  async execute(params, ctx: Tool.Context) {
+    const workdir = resolveDir(params.workdir)
     await ctx.ask({
       permission: "bash",
-      patterns: [params.command],
+      patterns: [commandPrefix(params.command)],
       always: ["*"],
-      metadata: { cwd },
+      metadata: { command: params.command, workdir },
     })
 
-    const output = await new Promise<string>((resolve, reject) => {
-      const proc = spawn(params.command, {
-        cwd,
-        shell: true,
-        env: process.env,
-        stdio: ["ignore", "pipe", "pipe"],
-      })
+    const cmd = process.platform === "win32"
+      ? ["cmd", "/c", params.command]
+      : ["/bin/sh", "-lc", params.command]
 
-      let result = ""
-      let killed = false
-
-      const append = (chunk: Buffer) => {
-        if (result.length >= MAX_OUTPUT_BYTES) return
-        result += chunk.toString()
-        if (result.length > MAX_OUTPUT_BYTES) {
-          result = result.slice(0, MAX_OUTPUT_BYTES) + "\n... (truncated)"
-        }
-      }
-
-      proc.stdout?.on("data", append)
-      proc.stderr?.on("data", append)
-      proc.on("error", reject)
-
-      const timer = setTimeout(() => {
-        killed = true
-        proc.kill("SIGTERM")
-      }, timeout)
-
-      proc.on("close", (code, signal) => {
-        clearTimeout(timer)
-        if (killed) {
-          return reject(new Error(`Command timed out after ${timeout}ms`))
-        }
-        if (signal) {
-          return reject(new Error(`Command terminated by signal: ${signal}`))
-        }
-        if (code && code !== 0) {
-          return reject(new Error(`Command failed with exit code ${code}\n\n${result}`))
-        }
-        resolve(result)
-      })
+    const proc = Bun.spawn({
+      cmd,
+      cwd: workdir,
+      stdout: "pipe",
+      stderr: "pipe",
     })
+
+    let timedOut = false
+    let aborted = false
+
+    const abortHandler = () => {
+      aborted = true
+      proc.kill()
+    }
+    ctx.abort.addEventListener("abort", abortHandler)
+
+    const timeoutMs = params.timeout ?? DEFAULT_TIMEOUT
+    const timer = setTimeout(() => {
+      timedOut = true
+      proc.kill()
+    }, timeoutMs)
+
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ])
+
+    clearTimeout(timer)
+    ctx.abort.removeEventListener("abort", abortHandler)
+
+    let output = stdout
+    if (stderr.trim()) {
+      output = output ? `${output}\n${stderr}` : stderr
+    }
+    if (timedOut) {
+      output += "\n\n[bash timeout]"
+    } else if (aborted) {
+      output += "\n\n[bash aborted]"
+    }
 
     return {
       title: params.description,
-      metadata: { cwd },
-      output: output || "(command produced no output)",
+      metadata: {
+        command: params.command,
+        workdir,
+        exitCode,
+        timedOut,
+        aborted,
+      },
+      output,
     }
   },
-})
+}))
