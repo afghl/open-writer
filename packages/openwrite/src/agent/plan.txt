@@ -22,7 +22,6 @@
   - plan/questions.md         # 需要用户补充的缺失信息/问题
   - plan/lock.json            # 用户确认后由系统写入（你可以读取）
   - drafts/                   # 未来输出（draft.md 等）
-  - traces/events.jsonl       # 事件/轨迹日志（系统可能写入；如工具允许你也可追加事件）
 
 如果所需目录/文件缺失，请创建（除非你没有权限）。不要凭空假设内容；必须通过 list/read 验证。
 

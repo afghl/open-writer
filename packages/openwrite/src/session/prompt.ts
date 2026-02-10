@@ -128,7 +128,6 @@ export namespace SessionPrompt {
         }
         await Session.updateMessage(assistant)
         const modelMessage = Message.toModelMessages(messages)
-        Log.Default.info("model message..", { messages, modelMessage })
         const processor = SessionProcessor.create({
           assistantMessage: assistant,
           sessionID,
