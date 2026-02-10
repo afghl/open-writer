@@ -136,6 +136,7 @@ export namespace SessionPrompt {
           tools,
           messages: modelMessage,
           abort,
+          // TODO: append input as system prompt?
           agentRef: agent,
         })
         lastResult = await processor.process()

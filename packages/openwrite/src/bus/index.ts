@@ -57,12 +57,7 @@ export namespace Bus {
         pending.push(sub(payload))
       }
     }
-    GlobalBus.emit("event", {
-      directory: Instance.directory,
-      payload,
-    })
-    await Promise.all(pending)
-    return
+    return Promise.all(pending)
   }
 
   export function subscribe<Definition extends BusEvent.Definition>(

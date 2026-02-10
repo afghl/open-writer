@@ -1,8 +1,5 @@
 // bus-event.ts
-import z, { ZodType } from "zod"
-import { Log } from "../util/log"
-
-const log = Log.create({ service: "event" })
+import { z, type ZodType } from "zod"
 
 export type Definition = ReturnType<typeof define>
 
