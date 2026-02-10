@@ -10,7 +10,7 @@ import { Log } from "@/util/log"
 export namespace LLM {
 
   export type StreamInput = {
-    sessionID: string
+    sessionID?: string
     user: Message.User
     messageID: string
     messages: ModelMessage[]

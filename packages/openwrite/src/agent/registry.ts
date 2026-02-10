@@ -29,7 +29,7 @@ export class AgentRegistry {
   }
 
   default() {
-    return "general"
+    return "plan"
   }
 
   resolve(id?: string): Agent {

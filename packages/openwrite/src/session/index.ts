@@ -9,6 +9,7 @@ const log = Log.create({ service: "session" })
 export namespace Session {
   export const Info = z.object({
     id: Identifier.schema("session"),
+    projectID: Identifier.schema("project"),
     title: z.string(),
     time: z.object({
       created: z.number(),
@@ -17,9 +18,10 @@ export namespace Session {
   })
   export type Info = z.infer<typeof Info>
 
-  export async function create(input?: { title?: string }) {
+  export async function create(input: { projectID: string; title?: string }) {
     const info: Info = {
       id: Identifier.ascending("session"),
+      projectID: input.projectID,
       title: input?.title ?? `New session - ${new Date().toISOString()}`,
       time: {
         created: Date.now(),

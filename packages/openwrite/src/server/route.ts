@@ -2,17 +2,23 @@ import { Hono } from "hono"
 import { streamSSE } from "hono/streaming"
 import { z } from "zod"
 import { subscribeAll } from "@/bus"
-import { runRequestContextAsync } from "@/context"
+import { ctx, runRequestContextAsync } from "@/context"
+import { agentRegistry } from "@/agent/registry"
+import { Project } from "@/project"
 import { Session } from "@/session"
 import { SessionPrompt } from "@/session/prompt"
 
 export const app = new Hono()
 const sessionPromptInput = z.object({ text: z.string().min(1), agent: z.string().min(1).optional() })
+const projectCreateInput = z.object({ title: z.string().min(1).optional() })
 
 const PROJECT_ID_HEADER = "x-project-id"
 
 export function setupRoutes(app: Hono) {
   app.use("*", async (c, next) => {
+    if (c.req.method === "POST" && c.req.path === "/api/project") {
+      return next()
+    }
     const projectId = c.req.header(PROJECT_ID_HEADER) ?? ""
     if (!projectId) {
       throw new Error("Project ID is required")
@@ -50,7 +56,42 @@ export function setupRoutes(app: Hono) {
     })
   })
 
-  app.post("/api/session/:id/prompt", async (c) => {
+  app.post("/api/project", async (c) => {
+    let body: unknown = {}
+    try {
+      const text = await c.req.text()
+      if (text.trim()) {
+        body = JSON.parse(text) as unknown
+      }
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400)
+    }
+
+    const parsed = projectCreateInput.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
+    }
+
+    try {
+      const defaultAgent = agentRegistry.default()
+      const project = await Project.create({
+        title: parsed.data.title,
+        curr_agent_name: defaultAgent,
+      })
+      const initialSession = await Session.create({
+        projectID: project.id,
+      })
+      const ready = await Project.update(project.id, (draft) => {
+        draft.curr_session_id = initialSession.id
+      })
+      return c.json({ project: ready })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+  })
+
+  app.post("/api/message", async (c) => {
     let body
     try {
       body = await c.req.json()
@@ -63,11 +104,35 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
     }
 
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+
+    let project: Project.Info
     try {
+      project = await Project.get(projectID)
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return c.json({ error: `Project ${projectID} not found` }, 404)
+      }
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+
+    try {
+      const resolved = agentRegistry.resolve(project.curr_agent_name)
+      const resolvedAgent = resolved.Info().name
+      let sessionID = project.curr_session_id
+
+      if (!sessionID) {
+        throw new Error("Session ID is required")
+      }
+
       const message = await SessionPrompt.prompt({
-        sessionID: c.req.param("id"),
+        sessionID,
         text: parsed.data.text,
-        agent: parsed.data.agent,
+        agent: resolvedAgent,
       })
       return c.json({ message })
     } catch (error) {
@@ -75,6 +140,12 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: message }, 500)
     }
   })
+}
+
+function isNotFoundError(error: unknown) {
+  if (!error || typeof error !== "object") return false
+  const value = error as { code?: unknown }
+  return value.code === "ENOENT"
 }
 
 export const serverConfig = {

@@ -2,6 +2,7 @@ import { z } from "zod"
 import { publish } from "@/bus"
 import { messageCreated, messageFinished } from "@/bus/events"
 import { Identifier } from "@/id/id"
+import { Project } from "@/project"
 import { Session } from "@/session"
 import { Message } from "@/session/message"
 import { ToolRegistry } from "@/tool/registry"
@@ -210,10 +211,6 @@ export namespace SessionPrompt {
     return { info, parts: [part] }
   }
 
-  function isDefaultTitle(title: string) {
-    return title.startsWith("New session - ")
-  }
-
   async function ensureTitleIfNeeded(
     sessionID: string,
     history: Message.WithParts[],
@@ -221,7 +218,9 @@ export namespace SessionPrompt {
   ) {
     if (!lastResult || lastResult.info.role !== "assistant" || !lastResult.info.time.completed) return
     const session = await Session.get(sessionID)
-    if (!session || !isDefaultTitle(session.title)) return
+    const projectID = session.projectID
+    const project = await Project.get(projectID)
+    if (!project || !Project.isDefaultTitle(project.title)) return
 
     const firstRealUserIndex = history.findIndex(
       (msg) =>
@@ -234,7 +233,6 @@ export namespace SessionPrompt {
     try {
       const agent = agentRegistry.resolve(firstUser.agent)
       const result = await LLM.stream({
-        sessionID,
         user: firstUser,
         messageID: lastResult.info.id,
         messages: [
@@ -255,11 +253,11 @@ export namespace SessionPrompt {
         .find((line) => line.length > 0)
       if (!cleaned) return
       const title = cleaned.length > 100 ? `${cleaned.slice(0, 97)}...` : cleaned
-      await Session.update(sessionID, (draft) => {
+      await Project.update(projectID, (draft) => {
         draft.title = title
       })
     } catch (error) {
-      Log.Default.warn("Failed to generate session title", { sessionID, error })
+      Log.Default.warn("Failed to generate project title", { projectID, error })
     }
   }
 
