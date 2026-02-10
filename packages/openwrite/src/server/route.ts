@@ -1,13 +1,55 @@
 import { Hono } from "hono"
+import { streamSSE } from "hono/streaming"
 import { z } from "zod"
+import { subscribeAll } from "@/bus"
+import { runRequestContextAsync } from "@/context"
 import { Session } from "@/session"
 import { SessionPrompt } from "@/session/prompt"
-import { Log } from "@/util/log"
 
 export const app = new Hono()
 const sessionPromptInput = z.object({ text: z.string().min(1), agent: z.string().min(1).optional() })
 
+const PROJECT_ID_HEADER = "x-project-id"
+
 export function setupRoutes(app: Hono) {
+  app.use("*", async (c, next) => {
+    const projectId = c.req.header(PROJECT_ID_HEADER) ?? ""
+    if (!projectId) {
+      throw new Error("Project ID is required")
+    }
+    return runRequestContextAsync({ project_id: projectId }, () => next())
+  })
+
+  const SSE_KEEPALIVE_INTERVAL_MS = 8_000
+
+  app.get("/event", async (c) => {
+    let unsub: (() => void) | undefined
+    return streamSSE(c, async (stream) => {
+      unsub = subscribeAll((event) => {
+        stream.writeSSE({
+          data: JSON.stringify(event.properties),
+          event: event.type,
+        })
+      })
+      const keepalive = setInterval(() => {
+        stream.writeSSE({ event: "ping", data: "" })
+      }, SSE_KEEPALIVE_INTERVAL_MS)
+      try {
+        await new Promise<void>((_, reject) => {
+          c.req.raw.signal?.addEventListener("abort", () =>
+            reject(new DOMException("Aborted", "AbortError")),
+          )
+        })
+      } finally {
+        clearInterval(keepalive)
+        unsub?.()
+      }
+    }, async (err) => {
+      unsub?.()
+      console.error(err)
+    })
+  })
+
   app.post("/api/session/:id/prompt", async (c) => {
     let body
     try {

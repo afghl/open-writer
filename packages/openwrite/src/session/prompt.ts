@@ -1,4 +1,6 @@
 import { z } from "zod"
+import { publish } from "@/bus"
+import { messageCreated, messageFinished } from "@/bus/events"
 import { Identifier } from "@/id/id"
 import { Session } from "@/session"
 import { Message } from "@/session/message"
@@ -7,7 +9,6 @@ import { SessionProcessor } from "@/session/processor"
 import { LLM } from "@/session/llm"
 import { agentRegistry } from "@/agent/registry"
 import { Log } from "@/util/log"
-import { finished } from "stream"
 
 export namespace SessionPrompt {
   const MAX_STEPS = 8
@@ -93,6 +94,11 @@ export namespace SessionPrompt {
           Log.Default.info("Has pending tool", { hasPendingTool })
           if (hasPendingTool) {
             lastResult = lastAssistant
+            publish(messageFinished, {
+              sessionID,
+              messageID: lastAssistant.info.id,
+              role: "assistant",
+            })
             break
           }
 
@@ -102,6 +108,11 @@ export namespace SessionPrompt {
             lastAssistant.info.id > lastUser.info.id
           ) {
             lastResult = lastAssistant
+            publish(messageFinished, {
+              sessionID,
+              messageID: lastAssistant.info.id,
+              role: "assistant",
+            })
             break
           }
         }
@@ -127,6 +138,7 @@ export namespace SessionPrompt {
           },
         }
         await Session.updateMessage(assistant)
+        void publish(messageCreated, { sessionID, messageID: assistant.id, role: "assistant" })
         const modelMessage = Message.toModelMessages(messages)
         const processor = SessionProcessor.create({
           assistantMessage: assistant,
@@ -136,10 +148,16 @@ export namespace SessionPrompt {
           tools,
           messages: modelMessage,
           abort,
-          // TODO: append input as system prompt?
+          // TODO: append references as system prompt?
           agentRef: agent,
         })
         lastResult = await processor.process()
+
+        publish(messageFinished, {
+          sessionID,
+          messageID: lastResult.info.id,
+          role: "assistant",
+        })
         await ensureTitleIfNeeded(sessionID, messages, lastResult)
       }
     } catch (caught) {
@@ -188,6 +206,7 @@ export namespace SessionPrompt {
 
     await Session.updateMessage(info)
     await Session.updatePart(part)
+    void publish(messageCreated, { sessionID: input.sessionID, messageID: info.id, role: "user" })
     return { info, parts: [part] }
   }
 
