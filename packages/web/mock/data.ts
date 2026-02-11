@@ -48,14 +48,14 @@ export const MOCK_MESSAGES: Message[] = [
     sessionId: "s-1",
     role: "user",
     content: "Please help me organize the component structure for the file tree.",
-    createdAt: new Date().toISOString(),
+    createdAt: "2026-02-11T14:36:00.000Z",
   },
   {
     id: "m-2",
     sessionId: "s-1",
     role: "assistant",
     content: "I can help with that. Based on your current stack, I recommend a recursive component approach. Here is the plan:",
-    createdAt: new Date().toISOString(),
+    createdAt: "2026-02-11T14:37:00.000Z",
     taskRun: {
       id: "t-1",
       title: "Analyzing Project Structure",
@@ -72,7 +72,7 @@ export const MOCK_MESSAGES: Message[] = [
     sessionId: "s-1",
     role: "assistant",
     content: "Should I proceed with generating the `FileNode` type definition first?",
-    createdAt: new Date().toISOString(),
+    createdAt: "2026-02-11T14:38:00.000Z",
   },
 ];
 

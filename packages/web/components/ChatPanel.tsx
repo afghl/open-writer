@@ -5,6 +5,21 @@ import { MOCK_MESSAGES, MOCK_SESSION } from "../mock/data";
 import { TaskCard } from "./TaskCard";
 import { cn } from "../lib/utils";
 
+const timeFormatter = new Intl.DateTimeFormat("en-US", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "UTC",
+});
+
+function MessageTime({ isoTime }: { isoTime: string }) {
+  return (
+    <span className="text-xs text-stone-300">
+      {timeFormatter.format(new Date(isoTime))}
+    </span>
+  );
+}
+
 export function ChatPanel() {
   return (
     <div className="flex flex-col h-full bg-white">
@@ -51,7 +66,7 @@ export function ChatPanel() {
                 <div className={cn("flex flex-col gap-1 min-w-0 flex-1", isUser && "items-end")}>
                     <div className="flex items-baseline gap-2">
                         <span className="text-sm font-bold text-stone-700">{isUser ? "You" : "OpenWrite Agent"}</span>
-                        <span className="text-xs text-stone-300">{new Date(msg.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        <MessageTime isoTime={msg.createdAt} />
                     </div>
                     
                     <div className={cn(

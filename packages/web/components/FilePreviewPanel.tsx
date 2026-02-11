@@ -1,8 +1,7 @@
 
 import React from "react";
-import { X, FileCode2, Pin, MoreHorizontal, History } from "lucide-react";
+import { X, FileCode2, Pin, History } from "lucide-react";
 import { FileNode } from "../types";
-import { MOCK_FILE_CONTENT } from "../mock/data";
 
 interface FilePreviewPanelProps {
   file: FileNode | null;
@@ -52,13 +51,13 @@ export function FilePreviewPanel({ file, onClose }: FilePreviewPanelProps) {
             </div>
             {/* Code */}
             <div className="flex-1 py-4 px-5 whitespace-pre-wrap">
-                <span className="text-purple-600">import</span> React <span className="text-purple-600">from</span> <span className="text-green-600">'react'</span>;
+                <span className="text-purple-600">import</span> React <span className="text-purple-600">from</span> <span className="text-green-600">&apos;react&apos;</span>;
                 {'\n\n'}
                 <span className="text-purple-600">export const</span> <span className="text-blue-600">Button</span> = ({'{'} children {'}'}) ={'>'} {'{'}
                 {'\n'}
                 {'  '}return (
                 {'\n'}
-                {'    '}&lt;<span className="text-red-600">button</span> className=<span className="text-green-600">"px-4 py-2 bg-blue-500 rounded"</span>&gt;
+                {'    '}&lt;<span className="text-red-600">button</span> className=<span className="text-green-600">&quot;px-4 py-2 bg-blue-500 rounded&quot;</span>&gt;
                 {'\n'}
                 {'      '}{'{'}children{'}'}
                 {'\n'}
