@@ -1,6 +1,26 @@
 import { z } from "zod"
+import { promises as fs } from "node:fs"
+import { rootHolder } from "@/global"
 import { Identifier } from "@/id/id"
 import { Storage } from "@/storage/storage"
+import { resolveWorkspacePath } from "@/path/workspace"
+
+const PROJECT_INIT_DIRS = [
+  "inputs/library/docs",
+  "inputs/library/summary/docs",
+  "inputs/insights",
+  "spec",
+  "article/chapters",
+  "article/versions",
+]
+
+async function initializeProjectWorkspace(projectID: string) {
+  for (const dir of PROJECT_INIT_DIRS) {
+    const logicalPath = `${rootHolder}/${dir}`
+    const { resolvedPath } = resolveWorkspacePath(logicalPath, projectID)
+    await fs.mkdir(resolvedPath, { recursive: true })
+  }
+}
 
 export namespace Project {
   export const Phase = z.enum(["planning", "writing"])
@@ -49,6 +69,7 @@ export namespace Project {
       },
     }
     await Storage.write(["project", info.id], info)
+    await initializeProjectWorkspace(info.id)
     return info
   }
 

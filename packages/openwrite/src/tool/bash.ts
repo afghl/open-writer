@@ -2,7 +2,7 @@ import z from "zod"
 import { Tool } from "./tool"
 import DESCRIPTION from "./bash.txt"
 import { rootHolder } from "@/global"
-import { resolveWorkspaceDir, rewriteCommandWorkspacePaths } from "./workspace"
+import { resolveWorkspaceDir, rewriteCommandWorkspacePaths } from "@/path/workspace"
 import { Log } from "@/util/log"
 const DEFAULT_TIMEOUT = 120_000
 const MAX_LINES = 2000

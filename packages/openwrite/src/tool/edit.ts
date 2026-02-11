@@ -4,7 +4,7 @@ import path from "node:path"
 import { createTwoFilesPatch, diffLines } from "diff"
 import { Tool } from "./tool"
 import DESCRIPTION from "./edit.txt"
-import { resolveWorkspacePath } from "./workspace"
+import { resolveWorkspacePath } from "@/path/workspace"
 
 const diffStats = (before: string, after: string) => {
   let additions = 0
