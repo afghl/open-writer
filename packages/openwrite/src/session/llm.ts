@@ -87,7 +87,7 @@ export namespace LLM {
       tools,
     }
     log.info("call llm request. ", {
-      model: req.model, tools: Object.keys(tools),
+      tools: Object.keys(tools),
     })
     const result = await streamText(req)
     return result
