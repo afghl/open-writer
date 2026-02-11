@@ -42,11 +42,29 @@ export function setupRoutes(app: Hono) {
       }, SSE_KEEPALIVE_INTERVAL_MS)
       try {
         await new Promise<void>((_, reject) => {
-          c.req.raw.signal?.addEventListener("abort", () =>
-            reject(new DOMException("Aborted", "AbortError")),
+          c.req.raw.signal?.addEventListener(
+            "abort",
+            () => {
+              const reason = c.req.raw.signal?.reason
+              const detail =
+                reason instanceof Error
+                  ? `${reason.name}: ${reason.message}`
+                  : reason === undefined
+                    ? "undefined"
+                    : String(reason)
+              console.info("[sse] request aborted", {
+                projectID: ctx()?.project_id ?? "",
+                detail,
+              })
+              reject(new DOMException("Aborted", "AbortError"))
+            },
+            { once: true },
           )
         })
       } finally {
+        console.info("[sse] stream cleanup", {
+          projectID: ctx()?.project_id ?? "",
+        })
         clearInterval(keepalive)
         unsub?.()
       }

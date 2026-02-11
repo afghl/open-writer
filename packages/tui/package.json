@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json.schemastore.org/package.json",
+  "name": "@open-write/tui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.tsx",
+    "start": "bun run src/index.tsx",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.1.77",
+    "@opentui/react": "^0.1.77",
+    "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/react": "^19.2.13",
+    "typescript": "catalog:"
+  }
+}
