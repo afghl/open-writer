@@ -4,9 +4,7 @@ import path from "node:path"
 import { createTwoFilesPatch, diffLines } from "diff"
 import { Tool } from "./tool"
 import DESCRIPTION from "./edit.txt"
-
-const resolvePath = (filePath: string) =>
-  path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath)
+import { resolveWorkspacePath } from "./workspace"
 
 const diffStats = (before: string, after: string) => {
   let additions = 0
@@ -27,12 +25,16 @@ export const EditTool = Tool.define("edit", async () => ({
     replaceAll: z.boolean().optional().describe("Replace all occurrences of oldString (default false)"),
   }),
   async execute(params, ctx: Tool.Context) {
-    const resolvedPath = resolvePath(params.filePath)
+    const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(params.filePath, ctx.projectID)
     await ctx.ask({
       permission: "edit",
       patterns: [resolvedPath],
       always: ["*"],
-      metadata: { filePath: resolvedPath },
+      metadata: {
+        inputPath: params.filePath,
+        filePath: resolvedPath,
+        logicalPath: logicalNamespacePath,
+      },
     })
 
     let before = ""

@@ -13,6 +13,7 @@ export namespace Tool {
     sessionID: string
     messageID: string
     agent: string
+    projectID: string
     abort: AbortSignal
     callID?: string
     messages: Message.WithParts[]

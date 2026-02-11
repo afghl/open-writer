@@ -3,12 +3,10 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { Tool } from "./tool"
 import DESCRIPTION from "./read.txt"
+import { resolveWorkspacePath } from "./workspace"
 
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
-
-const resolvePath = (filePath: string) =>
-  path.isAbsolute(filePath) ? filePath : path.resolve(process.cwd(), filePath)
 
 const formatLines = (lines: string[], offset: number) =>
   lines
@@ -45,12 +43,16 @@ export const ReadTool = Tool.define("read", async () => ({
       .describe("The number of lines to read (defaults to 2000)"),
   }),
   async execute(params, ctx: Tool.Context) {
-    const resolvedPath = resolvePath(params.filePath)
+    const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(params.filePath, ctx.projectID)
     await ctx.ask({
       permission: "read",
       patterns: [resolvedPath],
       always: ["*"],
-      metadata: { filePath: resolvedPath },
+      metadata: {
+        inputPath: params.filePath,
+        filePath: resolvedPath,
+        logicalPath: logicalNamespacePath,
+      },
     })
 
     const stat = await fs.stat(resolvedPath)

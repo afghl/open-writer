@@ -1,14 +1,12 @@
 import z from "zod"
-import path from "node:path"
 import { Tool } from "./tool"
 import DESCRIPTION from "./bash.txt"
-
+import { rootHolder } from "@/global"
+import { resolveWorkspaceDir, rewriteCommandWorkspacePaths } from "./workspace"
+import { Log } from "@/util/log"
 const DEFAULT_TIMEOUT = 120_000
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
-
-const resolveDir = (workdir?: string) =>
-  workdir ? (path.isAbsolute(workdir) ? workdir : path.resolve(process.cwd(), workdir)) : process.cwd()
 
 const commandPrefix = (command: string) => {
   const trimmed = command.trim()
@@ -17,7 +15,7 @@ const commandPrefix = (command: string) => {
 }
 
 export const BashTool = Tool.define("bash", async () => ({
-  description: DESCRIPTION.replaceAll("${directory}", process.cwd())
+  description: DESCRIPTION.replaceAll("${directory}", rootHolder)
     .replaceAll("${maxLines}", String(MAX_LINES))
     .replaceAll("${maxBytes}", String(MAX_BYTES)),
   parameters: z.object({
@@ -26,7 +24,7 @@ export const BashTool = Tool.define("bash", async () => ({
     workdir: z
       .string()
       .describe(
-        `The working directory to run the command in. Defaults to ${process.cwd()}. Use this instead of 'cd' commands.`,
+        `The working directory to run the command in. Defaults to ${rootHolder}. Use this instead of 'cd' commands.`,
       )
       .optional(),
     description: z
@@ -36,18 +34,25 @@ export const BashTool = Tool.define("bash", async () => ({
       ),
   }),
   async execute(params, ctx: Tool.Context) {
-    const workdir = resolveDir(params.workdir)
+    const resolvedCommand = rewriteCommandWorkspacePaths(params.command, ctx.projectID)
+    const { resolvedPath: workdir, logicalNamespacePath } = resolveWorkspaceDir(params.workdir, ctx.projectID)
     await ctx.ask({
       permission: "bash",
-      patterns: [commandPrefix(params.command)],
+      patterns: [commandPrefix(resolvedCommand)],
       always: ["*"],
-      metadata: { command: params.command, workdir },
+      metadata: {
+        command: params.command,
+        resolvedCommand,
+        inputWorkdir: params.workdir ?? rootHolder,
+        workdir,
+        logicalWorkdir: logicalNamespacePath,
+      },
     })
 
     const cmd = process.platform === "win32"
-      ? ["cmd", "/c", params.command]
-      : ["/bin/sh", "-lc", params.command]
-
+      ? ["cmd", "/c", resolvedCommand]
+      : ["/bin/sh", "-lc", resolvedCommand]
+    Log.Default.info("Executing command", { cmd, cwd: workdir })
     const proc = Bun.spawn({
       cmd,
       cwd: workdir,
@@ -93,7 +98,7 @@ export const BashTool = Tool.define("bash", async () => ({
       title: params.description,
       metadata: {
         command: params.command,
-        workdir,
+        success: exitCode == 0,
         exitCode,
         timedOut,
         aborted,

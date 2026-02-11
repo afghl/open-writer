@@ -10,6 +10,7 @@ import { SessionProcessor } from "@/session/processor"
 import { LLM } from "@/session/llm"
 import { agentRegistry } from "@/agent/registry"
 import { Log } from "@/util/log"
+import { ctx as requestContext } from "@/context"
 
 export namespace SessionPrompt {
   const MAX_STEPS = 8
@@ -75,6 +76,7 @@ export namespace SessionPrompt {
     let lastResult: Message.WithParts | undefined
     let error: unknown
     let step = 0
+    const projectID = requestContext()?.project_id ?? ""
 
     try {
       while (true) {
@@ -144,6 +146,7 @@ export namespace SessionPrompt {
         const processor = SessionProcessor.create({
           assistantMessage: assistant,
           sessionID,
+          projectID,
           user: lastUser.info,
           history: messages,
           tools,
@@ -233,6 +236,7 @@ export namespace SessionPrompt {
     try {
       const agent = agentRegistry.resolve(firstUser.agent)
       const result = await LLM.stream({
+        projectID,
         user: firstUser,
         messageID: lastResult.info.id,
         messages: [

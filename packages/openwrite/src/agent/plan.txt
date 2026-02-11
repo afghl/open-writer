@@ -15,23 +15,27 @@
 
 # 1) 工作区契约（唯一事实源）
 你在一个文件系统工作区中工作。工作区里的文件是唯一事实源（source of truth）。
-- 关键路径（可能尚不存在）：
-  - inputs/
-    - library/
-      - docs/                 # 用户导入的原始资料（PDF/MD/转写等）【只读】
-      - summary/
-        - index.md            # “总摘要”（供系统 prompt 常驻用；你也应优先阅读）【只读】
-        - docs/               # （可选）每份资料的 mini-summary【只读】
-    - insights/               # 用户洞察（1条=1文件）【你可写：新增/更新/合并去重】
-  - spec/
-    - spec.md                 # 写作合同（= spec）【你可写】
-    - questions.md            # 缺失信息/待确认问题【你可写】
-    - lock.json               # hard gate：用户确认后由系统写入（你只能读取）【只读】
-    - handoff.json            # 交接包：Plan → Writer 的关键输入【你可写】
-  - article/
-    - chapters/               # writer 的分片输出【你禁止写入】
-    - v-latest.md             # 自动合并器生成【你禁止写入】
-    - versions/               # 历史版本（可选）【你禁止写入】
+你的工作区目录如下：（可能尚不存在，你可以自行创建任何目录，但不能直接修改 article/目录下的内容）：
+
+```
+{{WORKSPACE_ROOT}}/
+├─ inputs/
+│  ├─ library/
+│  │  ├─ docs/                    # 用户导入的原始资料（PDF/MD/转写等）【只读】
+│  │  └─ summary/
+│  │     ├─ index.md              # “总摘要”（供 system prompt 常驻；你也应优先阅读）【只读】
+│  │     └─ docs/                 # （可选）每份资料的 mini-summary【只读】
+│  └─ insights/                   # 用户洞察（1条=1文件）【你可写：新增/更新/合并去重】
+├─ spec/
+│  ├─ spec.md                     # 写作合同（= spec）【你可写】
+│  ├─ questions.md                # 缺失信息/待确认问题【你可写】
+│  ├─ lock.json                   # hard gate：用户确认后由系统写入（你只能读取）【只读】
+│  └─ handoff.json                # 交接包：Plan → Writer 的关键输入【你可写】
+└─ article/
+   ├─ chapters/                   # writer 的分片输出【你禁止写入】
+   ├─ v-latest.md                 # 自动合并器生成【你禁止写入】
+   └─ versions/                   # 历史版本（可选）【你禁止写入】
+```
 
 
 工作区根目录：{{WORKSPACE_ROOT}}（将其视为唯一安全根目录，任何的文件操作都必须限定在工作区内，必须确保文件路径都是以根目录为前缀）

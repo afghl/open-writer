@@ -10,6 +10,7 @@ import type { Agent } from "@/agent/types"
 type CreateInput = {
   assistantMessage: Message.Assistant
   sessionID: string
+  projectID: string
   user: Message.User
   history: Message.WithParts[]
   tools: Array<Awaited<ReturnType<Tool.Info["init"]>> & { id: string }>
@@ -34,6 +35,7 @@ export const create = (input: CreateInput) => {
       })
       const stream = await LLM.stream({
         sessionID: input.sessionID,
+        projectID: input.projectID,
         user: input.user,
         messageID: input.assistantMessage.id,
         messages: input.messages,

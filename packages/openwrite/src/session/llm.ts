@@ -11,6 +11,7 @@ export namespace LLM {
 
   export type StreamInput = {
     sessionID?: string
+    projectID: string
     user: Message.User
     messageID: string
     messages: ModelMessage[]
@@ -56,6 +57,7 @@ export namespace LLM {
             sessionID: input.sessionID,
             messageID: input.messageID,
             agent: agentInfo?.name,
+            projectID: input.projectID,
             abort: input.abort,
             callID: options.toolCallId,
             messages: input.history,
