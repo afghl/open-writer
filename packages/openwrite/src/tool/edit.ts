@@ -5,6 +5,8 @@ import { createTwoFilesPatch, diffLines } from "diff"
 import { Tool } from "./tool"
 import DESCRIPTION from "./edit.txt"
 import { resolveWorkspacePath } from "@/path/workspace"
+import { publish } from "@/bus"
+import { fsUpdated } from "@/bus/events"
 
 const diffStats = (before: string, after: string) => {
   let additions = 0
@@ -63,6 +65,13 @@ export const EditTool = Tool.define("edit", async () => ({
     }
 
     await fs.writeFile(resolvedPath, after, "utf8")
+    await publish(fsUpdated, {
+      projectID: ctx.projectID,
+      path: logicalNamespacePath,
+      kind: "file",
+      source: "agent_tool",
+      time: Date.now(),
+    })
 
     const diff = createTwoFilesPatch(
       resolvedPath,

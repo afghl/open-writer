@@ -32,6 +32,14 @@ export async function publish<Definition extends BusEvent.Definition>(
   properties: z.output<Definition["properties"]>,
 ) {
   const projectId = currentProjectId()
+  return publishInProject(projectId, def, properties)
+}
+
+export async function publishInProject<Definition extends BusEvent.Definition>(
+  projectId: string,
+  def: Definition,
+  properties: z.output<Definition["properties"]>,
+) {
   const payload = {
     type: def.type,
     properties,

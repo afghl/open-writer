@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { Hono, type Context } from "hono"
 import { streamSSE } from "hono/streaming"
 import { z } from "zod"
 import { subscribeAll } from "@/bus"
@@ -7,10 +7,21 @@ import { agentRegistry } from "@/agent/registry"
 import { Project } from "@/project"
 import { Session } from "@/session"
 import { SessionPrompt } from "@/session/prompt"
+import { listTree, readFile } from "@/fs/workspace"
+import { FsServiceError } from "@/fs/types"
 
 export const app = new Hono()
 const sessionPromptInput = z.object({ text: z.string().min(1), agent: z.string().min(1).optional() })
 const projectCreateInput = z.object({ title: z.string().min(1).optional() })
+const fsTreeInput = z.object({
+  path: z.string().optional(),
+  depth: z.coerce.number().int().min(0).optional(),
+})
+const fsReadInput = z.object({
+  path: z.string().min(1),
+  offset: z.coerce.number().int().min(0).optional(),
+  limit: z.coerce.number().int().min(1).optional(),
+})
 
 const PROJECT_ID_HEADER = "x-project-id"
 
@@ -72,6 +83,49 @@ export function setupRoutes(app: Hono) {
       unsub?.()
       console.error(err)
     })
+  })
+
+  app.get("/api/fs/tree", async (c) => {
+    const parsed = fsTreeInput.safeParse(c.req.query())
+    if (!parsed.success) {
+      return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
+    }
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+    try {
+      const result = await listTree({
+        projectID,
+        path: parsed.data.path,
+        depth: parsed.data.depth,
+      })
+      return c.json(result)
+    } catch (error) {
+      return fsErrorResponse(c, error)
+    }
+  })
+
+  app.get("/api/fs/read", async (c) => {
+    const parsed = fsReadInput.safeParse(c.req.query())
+    if (!parsed.success) {
+      return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
+    }
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+    try {
+      const result = await readFile({
+        projectID,
+        path: parsed.data.path,
+        offset: parsed.data.offset,
+        limit: parsed.data.limit,
+      })
+      return c.json(result)
+    } catch (error) {
+      return fsErrorResponse(c, error)
+    }
   })
 
   app.post("/api/project", async (c) => {
@@ -164,6 +218,24 @@ function isNotFoundError(error: unknown) {
   if (!error || typeof error !== "object") return false
   const value = error as { code?: unknown }
   return value.code === "ENOENT"
+}
+
+function fsErrorResponse(c: Context, error: unknown) {
+  if (!(error instanceof FsServiceError)) {
+    const message = error instanceof Error ? error.message : "Unknown error"
+    return c.json({ error: message }, 500)
+  }
+  switch (error.code) {
+    case "INVALID_PATH":
+      return c.json({ error: error.message, code: error.code }, 400)
+    case "NOT_FOUND":
+      return c.json({ error: error.message, code: error.code }, 404)
+    case "NOT_FILE":
+    case "NOT_DIR":
+      return c.json({ error: error.message, code: error.code }, 422)
+    default:
+      return c.json({ error: error.message, code: error.code }, 500)
+  }
 }
 
 export const serverConfig = {
