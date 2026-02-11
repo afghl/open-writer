@@ -1,0 +1,34 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 60 5% 98%; /* Warm Stone-50 */
+  --foreground: 240 10% 3.9%;
+  --border: 240 5.9% 90%;
+}
+
+body {
+  background-color: rgb(250, 250, 249);
+  color: #1c1917;
+}
+
+/* Custom Scrollbar */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+/* Tree indentation lines */
+.tree-line {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background-color: #e7e5e4;
+}
