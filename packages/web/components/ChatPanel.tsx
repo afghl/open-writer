@@ -404,7 +404,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
                   </div>
 
                   <div className={cn(
-                    "leading-7 text-base md:text-lg",
+                    "leading-7 text-base md:text-medium",
                     isUser
                       ? "px-5 py-3 rounded-2xl bg-[#FAFAF9] border border-stone-200 text-stone-800 rounded-tr-sm shadow-sm"
                       : "px-0 py-0 text-stone-800",
