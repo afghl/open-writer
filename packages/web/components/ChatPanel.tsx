@@ -1,13 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Hash, Zap, Plus, Paperclip, ArrowUp, Bot } from "lucide-react";
 import { cn } from "../lib/utils";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   listMessages,
-  sendMessage,
+  sendMessageStream,
+  type MessageStreamEvent,
   type OpenwriteMessageWithParts,
 } from "@/lib/openwrite-client";
 
@@ -28,6 +29,45 @@ function MessageTime({ timestamp }: { timestamp: number }) {
 
 function messageText(message: OpenwriteMessageWithParts) {
   return message.parts.map((part) => part.text).join("").trim();
+}
+
+type DisplayMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt: number;
+  pending?: boolean;
+};
+
+function mapToDisplayMessage(message: OpenwriteMessageWithParts): DisplayMessage {
+  return {
+    id: message.info.id,
+    role: message.info.role,
+    text: messageText(message),
+    createdAt: message.info.time.created,
+  };
+}
+
+function mergeMessageLists(
+  current: OpenwriteMessageWithParts[],
+  incoming: OpenwriteMessageWithParts[],
+) {
+  if (incoming.length === 0) {
+    return current;
+  }
+  const merged = [...current];
+  const indexByID = new Map(merged.map((message, index) => [message.info.id, index]));
+  for (const next of incoming) {
+    const index = indexByID.get(next.info.id);
+    if (typeof index === "number") {
+      merged[index] = next;
+      continue;
+    }
+    indexByID.set(next.info.id, merged.length);
+    merged.push(next);
+  }
+  merged.sort((a, b) => (a.info.id > b.info.id ? 1 : -1));
+  return merged;
 }
 
 const markdownComponents: Components = {
@@ -65,7 +105,7 @@ const markdownComponents: Components = {
       </pre>
     );
   },
-  code({ node: _node, className, children, ...props }) {
+  code({ className, children, ...props }) {
     const hasLanguage = typeof className === "string" && className.includes("language-");
     return (
       <code
@@ -92,12 +132,45 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
+  const [optimisticUserMessage, setOptimisticUserMessage] = useState<DisplayMessage | null>(null);
+  const [streamingAssistantMessage, setStreamingAssistantMessage] = useState<DisplayMessage | null>(null);
 
-  const refreshMessages = useCallback(async () => {
-    const payload = await listMessages({ projectID });
+  const messageListRef = useRef<OpenwriteMessageWithParts[]>([]);
+  const sendingAbortRef = useRef<AbortController | null>(null);
+
+  const refreshMessages = useCallback(async (input?: { lastMessageID?: string }) => {
+    const payload = await listMessages({
+      projectID,
+      ...(input?.lastMessageID ? { lastMessageID: input.lastMessageID } : {}),
+    });
     setSessionID(payload.sessionID);
-    setMessages(payload.messages);
+    setMessages((previous) => {
+      if (!input?.lastMessageID) {
+        return payload.messages;
+      }
+      return mergeMessageLists(previous, payload.messages);
+    });
+    return payload;
   }, [projectID]);
+
+  useEffect(() => {
+    messageListRef.current = messages;
+  }, [messages]);
+
+  useEffect(() => {
+    sendingAbortRef.current?.abort();
+    sendingAbortRef.current = null;
+    setSending(false);
+    setOptimisticUserMessage(null);
+    setStreamingAssistantMessage(null);
+  }, [projectID]);
+
+  useEffect(() => {
+    return () => {
+      sendingAbortRef.current?.abort();
+      sendingAbortRef.current = null;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -126,18 +199,29 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
     };
   }, [projectID]);
 
-  const displayMessages = useMemo(
-    () =>
-      messages
-        .map((message) => ({
-          id: message.info.id,
-          role: message.info.role,
-          text: messageText(message),
-          createdAt: message.info.time.created,
-        }))
-        .filter((message) => message.text.length > 0),
-    [messages],
-  );
+  const displayMessages = useMemo(() => {
+    const persisted = messages
+      .map(mapToDisplayMessage)
+      .filter((message) => message.text.length > 0);
+
+    const messageMap = new Map<string, DisplayMessage>();
+    for (const message of persisted) {
+      messageMap.set(message.id, message);
+    }
+    if (optimisticUserMessage) {
+      messageMap.set(optimisticUserMessage.id, optimisticUserMessage);
+    }
+    if (streamingAssistantMessage) {
+      messageMap.set(streamingAssistantMessage.id, streamingAssistantMessage);
+    }
+
+    return Array.from(messageMap.values()).sort((a, b) => {
+      if (a.createdAt !== b.createdAt) {
+        return a.createdAt - b.createdAt;
+      }
+      return a.id > b.id ? 1 : -1;
+    });
+  }, [messages, optimisticUserMessage, streamingAssistantMessage]);
 
   const status = sending ? "busy" : "idle";
 
@@ -145,16 +229,130 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
     const text = inputValue.trim();
     if (!text || sending) return;
 
+    const now = Date.now();
+    const localUserID = `local-user-${now}`;
+    const localAssistantID = `local-assistant-${now}`;
+    const lastMessageID = messageListRef.current.at(-1)?.info.id;
+    const controller = new AbortController();
+
+    sendingAbortRef.current = controller;
     setInputValue("");
     setSending(true);
     setError(null);
+    setOptimisticUserMessage({
+      id: localUserID,
+      role: "user",
+      text,
+      createdAt: now,
+      pending: true,
+    });
+    setStreamingAssistantMessage({
+      id: localAssistantID,
+      role: "assistant",
+      text: "",
+      createdAt: now,
+      pending: true,
+    });
+
+    const onStreamEvent = (event: MessageStreamEvent) => {
+      if (event.type === "user_ack") {
+        setSessionID(event.sessionID);
+        setOptimisticUserMessage((previous) => {
+          if (!previous) return previous;
+          if (previous.id !== localUserID && previous.id !== event.userMessageID) {
+            return previous;
+          }
+          return {
+            ...previous,
+            id: event.userMessageID,
+            createdAt: event.createdAt,
+          };
+        });
+        return;
+      }
+
+      if (event.type === "assistant_start") {
+        setSessionID(event.sessionID);
+        setStreamingAssistantMessage((previous) => {
+          if (!previous) {
+            return {
+              id: event.assistantMessageID,
+              role: "assistant",
+              text: "",
+              createdAt: event.createdAt,
+              pending: true,
+            };
+          }
+          return {
+            ...previous,
+            id: event.assistantMessageID,
+            text: previous.id === event.assistantMessageID ? previous.text : "",
+            createdAt: event.createdAt,
+            pending: true,
+          };
+        });
+        return;
+      }
+
+      if (event.type === "text_delta") {
+        setSessionID(event.sessionID);
+        setStreamingAssistantMessage((previous) => {
+          if (!previous) {
+            return {
+              id: event.assistantMessageID,
+              role: "assistant",
+              text: event.delta,
+              createdAt: Date.now(),
+              pending: true,
+            };
+          }
+          const shouldAppend =
+            previous.id === localAssistantID || previous.id === event.assistantMessageID;
+          const nextText = shouldAppend ? previous.text + event.delta : event.delta;
+          return {
+            ...previous,
+            id: event.assistantMessageID,
+            text: nextText,
+            pending: true,
+          };
+        });
+        return;
+      }
+
+      if (event.type === "done") {
+        setSessionID(event.sessionID);
+        return;
+      }
+
+      if (event.type === "error") {
+        setError(event.message);
+      }
+    };
+
     try {
-      await sendMessage({ projectID, text });
-      await refreshMessages();
+      await sendMessageStream({
+        projectID,
+        text,
+        signal: controller.signal,
+        onEvent: onStreamEvent,
+      });
+      await refreshMessages(lastMessageID ? { lastMessageID } : undefined);
+      setOptimisticUserMessage(null);
+      setStreamingAssistantMessage(null);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
+      try {
+        await refreshMessages(lastMessageID ? { lastMessageID } : undefined);
+      } catch {
+        // Keep original error.
+      }
+      setOptimisticUserMessage(null);
+      setStreamingAssistantMessage(null);
     } finally {
+      if (sendingAbortRef.current === controller) {
+        sendingAbortRef.current = null;
+      }
       setSending(false);
     }
   }, [inputValue, projectID, refreshMessages, sending]);
@@ -213,6 +411,8 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
                   )}>
                     {isUser ? (
                       msg.text
+                    ) : msg.text.length === 0 ? (
+                      <span className="text-stone-400">Thinking...</span>
                     ) : (
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                         {msg.text}

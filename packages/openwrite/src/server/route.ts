@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono"
 import { streamSSE } from "hono/streaming"
 import { z } from "zod"
 import { resolveProxyToken } from "./env"
-import { subscribeAll } from "@/bus"
+import { subscribe } from "@/bus"
 import { ctx, runRequestContextAsync } from "@/context"
 import { agentRegistry } from "@/agent/registry"
 import { Project } from "@/project"
@@ -11,6 +11,15 @@ import { Message } from "@/session/message"
 import { SessionPrompt } from "@/session/prompt"
 import { listTree, readFile } from "@/fs/workspace"
 import { FsServiceError } from "@/fs/types"
+import {
+  fsCreated,
+  fsDeleted,
+  fsMoved,
+  fsUpdated,
+  messageCreated,
+  messageDelta,
+  messageFinished,
+} from "@/bus/events"
 
 export const app = new Hono()
 const sessionPromptInput = z.object({ text: z.string().min(1), agent: z.string().min(1).optional() })
@@ -26,6 +35,7 @@ const fsReadInput = z.object({
 })
 const messageListInput = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
+  last_message_id: z.string().min(1).optional(),
 })
 
 const PROJECT_ID_HEADER = "x-project-id"
@@ -63,15 +73,23 @@ export function setupRoutes(app: Hono) {
 
   const SSE_KEEPALIVE_INTERVAL_MS = 8_000
 
-  app.get("/event", async (c) => {
-    let unsub: (() => void) | undefined
+  app.get("/event/fs", async (c) => {
+    const unsubscribers: Array<() => void> = []
     return streamSSE(c, async (stream) => {
-      unsub = subscribeAll((event) => {
-        stream.writeSSE({
-          data: JSON.stringify(event.properties),
-          event: event.type,
-        })
+      const subscribeFsEvent = (eventName: string, payload: unknown) => stream.writeSSE({
+        data: JSON.stringify(payload),
+        event: eventName,
       })
+      unsubscribers.push(
+        subscribe(fsCreated, (event) =>
+          subscribeFsEvent(event.type, event.properties)),
+        subscribe(fsUpdated, (event) =>
+          subscribeFsEvent(event.type, event.properties)),
+        subscribe(fsDeleted, (event) =>
+          subscribeFsEvent(event.type, event.properties)),
+        subscribe(fsMoved, (event) =>
+          subscribeFsEvent(event.type, event.properties)),
+      )
       const keepalive = setInterval(() => {
         stream.writeSSE({ event: "ping", data: "" })
       }, SSE_KEEPALIVE_INTERVAL_MS)
@@ -87,7 +105,7 @@ export function setupRoutes(app: Hono) {
                   : reason === undefined
                     ? "undefined"
                     : String(reason)
-              console.info("[sse] request aborted", {
+              console.info("[sse] fs request aborted", {
                 projectID: ctx()?.project_id ?? "",
                 detail,
               })
@@ -97,14 +115,181 @@ export function setupRoutes(app: Hono) {
           )
         })
       } finally {
-        console.info("[sse] stream cleanup", {
+        console.info("[sse] fs stream cleanup", {
           projectID: ctx()?.project_id ?? "",
         })
         clearInterval(keepalive)
-        unsub?.()
+        for (const unsubscribe of unsubscribers) {
+          unsubscribe()
+        }
       }
     }, async (err) => {
-      unsub?.()
+      for (const unsubscribe of unsubscribers) {
+        unsubscribe()
+      }
+      console.error(err)
+    })
+  })
+
+  app.post("/api/message/stream", async (c) => {
+    let body
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400)
+    }
+
+    const parsed = sessionPromptInput.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
+    }
+
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+
+    let project: Project.Info
+    try {
+      project = await Project.get(projectID)
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return c.json({ error: `Project ${projectID} not found` }, 404)
+      }
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+
+    const resolved = agentRegistry.resolve(project.curr_agent_name)
+    const resolvedAgent = resolved.Info().name
+    const sessionID = project.curr_session_id
+    if (!sessionID) {
+      return c.json({ error: "Session ID is required" }, 500)
+    }
+
+    try {
+      SessionPrompt.assertNotBusy(sessionID)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Session is busy"
+      return c.json({ error: message }, 409)
+    }
+
+    let rootUserMessageID = ""
+    let latestAssistantMessageID = ""
+    let doneSent = false
+
+    return streamSSE(c, async (stream) => {
+      const keepalive = setInterval(() => {
+        stream.writeSSE({ event: "ping", data: "" })
+      }, SSE_KEEPALIVE_INTERVAL_MS)
+
+      const writeEvent = async (eventName: string, payload: unknown) => {
+        await stream.writeSSE({
+          data: JSON.stringify(payload),
+          event: eventName,
+        })
+      }
+
+      const shouldHandleAssistant = (parentUserMessageID?: string) =>
+        rootUserMessageID.length > 0 && parentUserMessageID === rootUserMessageID
+      const isTerminalAssistantFinish = (finish?: string) =>
+        finish !== "tool-calls" && finish !== "unknown"
+
+      const unsubscribeCreated = subscribe(messageCreated, async (event) => {
+        const payload = event.properties
+        if (payload.sessionID !== sessionID) return
+
+        if (payload.role === "user") {
+          if (rootUserMessageID.length > 0) return
+          rootUserMessageID = payload.messageID
+          await writeEvent("user_ack", {
+            sessionID: payload.sessionID,
+            userMessageID: payload.messageID,
+            createdAt: payload.createdAt,
+          })
+          return
+        }
+
+        if (!shouldHandleAssistant(payload.parentUserMessageID)) return
+        latestAssistantMessageID = payload.messageID
+        await writeEvent("assistant_start", {
+          sessionID: payload.sessionID,
+          assistantMessageID: payload.messageID,
+          parentUserMessageID: payload.parentUserMessageID,
+          createdAt: payload.createdAt,
+        })
+      })
+
+      const unsubscribeDelta = subscribe(messageDelta, async (event) => {
+        const payload = event.properties
+        if (payload.sessionID !== sessionID) return
+        if (!shouldHandleAssistant(payload.parentUserMessageID)) return
+        if (payload.delta.length === 0) return
+        latestAssistantMessageID = payload.messageID
+        await writeEvent("text_delta", {
+          sessionID: payload.sessionID,
+          assistantMessageID: payload.messageID,
+          delta: payload.delta,
+        })
+      })
+
+      const unsubscribeFinished = subscribe(messageFinished, async (event) => {
+        const payload = event.properties
+        if (payload.sessionID !== sessionID || payload.role !== "assistant") return
+        if (!shouldHandleAssistant(payload.parentUserMessageID)) return
+        latestAssistantMessageID = payload.messageID
+        if (!isTerminalAssistantFinish(payload.finishReason)) return
+        doneSent = true
+        await writeEvent("done", {
+          sessionID: payload.sessionID,
+          assistantMessageID: payload.messageID,
+          completedAt: payload.completedAt,
+          finishReason: payload.finishReason ?? "stop",
+        })
+      })
+
+      const abortListener = () => {
+        SessionPrompt.cancel(sessionID)
+      }
+      c.req.raw.signal?.addEventListener("abort", abortListener, { once: true })
+
+      try {
+        const result = await SessionPrompt.prompt({
+          sessionID,
+          text: parsed.data.text,
+          agent: resolvedAgent,
+        })
+        if (!doneSent && result.info.role === "assistant") {
+          latestAssistantMessageID = result.info.id
+          await writeEvent("done", {
+            sessionID: result.info.sessionID,
+            assistantMessageID: result.info.id,
+            completedAt: result.info.time.completed ?? Date.now(),
+            finishReason: result.info.finish ?? "stop",
+          })
+        }
+      } catch (error) {
+        const aborted =
+          (error instanceof DOMException && error.name === "AbortError")
+          || (error instanceof Error && error.name === "AbortError")
+        await writeEvent("error", {
+          code: "STREAM_RUNTIME_ERROR",
+          message: aborted
+            ? "Stream aborted"
+            : error instanceof Error
+              ? error.message
+              : String(error),
+          retriable: !aborted,
+          ...(latestAssistantMessageID ? { assistantMessageID: latestAssistantMessageID } : {}),
+        })
+      } finally {
+        clearInterval(keepalive)
+        c.req.raw.signal?.removeEventListener("abort", abortListener)
+        unsubscribeCreated()
+        unsubscribeDelta()
+        unsubscribeFinished()
+      }
+    }, async (err) => {
       console.error(err)
     })
   })
@@ -277,10 +462,18 @@ export function setupRoutes(app: Hono) {
     try {
       const allMessages = await Session.messages({ sessionID })
       const filteredMessages = filterRenderableMessages(allMessages)
+      const lastMessageID = parsed.data.last_message_id?.trim()
+      const incrementMessages =
+        lastMessageID && lastMessageID.length > 0
+          ? (() => {
+            const index = filteredMessages.findIndex((message) => message.info.id === lastMessageID)
+            return index === -1 ? filteredMessages : filteredMessages.slice(index + 1)
+          })()
+          : filteredMessages
       const limit = parsed.data.limit
       const messages = typeof limit === "number"
-        ? filteredMessages.slice(-limit)
-        : filteredMessages
+        ? incrementMessages.slice(-limit)
+        : incrementMessages
       return c.json({ sessionID, messages })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error"

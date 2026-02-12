@@ -84,7 +84,7 @@ export default function AppShell({ projectSlug }: AppShellProps) {
   useEffect(() => {
     if (!projectID) return;
 
-    const source = new EventSource(`/events?project_id=${encodeURIComponent(projectID)}`);
+    const source = new EventSource(`/events/fs?project_id=${encodeURIComponent(projectID)}`);
     const onFsChange = () => {
       setFsRefreshTick((tick) => tick + 1);
     };

@@ -14,6 +14,7 @@ import { ctx as requestContext } from "@/context"
 
 export namespace SessionPrompt {
   const MAX_STEPS = 8
+
   const busyState = new Map<
     string,
     {
@@ -97,10 +98,13 @@ export namespace SessionPrompt {
           Log.Default.info("Has pending tool", { hasPendingTool })
           if (hasPendingTool) {
             lastResult = lastAssistant
-            publish(messageFinished, {
+            await publish(messageFinished, {
               sessionID,
               messageID: lastAssistant.info.id,
               role: "assistant",
+              completedAt: lastAssistant.info.time.completed ?? Date.now(),
+              finishReason: lastAssistant.info.finish,
+              parentUserMessageID: lastAssistant.info.parentID,
             })
             break
           }
@@ -111,10 +115,13 @@ export namespace SessionPrompt {
             lastAssistant.info.id > lastUser.info.id
           ) {
             lastResult = lastAssistant
-            publish(messageFinished, {
+            await publish(messageFinished, {
               sessionID,
               messageID: lastAssistant.info.id,
               role: "assistant",
+              completedAt: lastAssistant.info.time.completed ?? Date.now(),
+              finishReason: lastAssistant.info.finish,
+              parentUserMessageID: lastAssistant.info.parentID,
             })
             break
           }
@@ -141,7 +148,13 @@ export namespace SessionPrompt {
           },
         }
         await Session.updateMessage(assistant)
-        void publish(messageCreated, { sessionID, messageID: assistant.id, role: "assistant" })
+        await publish(messageCreated, {
+          sessionID,
+          messageID: assistant.id,
+          role: "assistant",
+          createdAt: assistant.time.created,
+          parentUserMessageID: lastUser.info.id,
+        })
         const modelMessage = Message.toModelMessages(messages)
         const processor = SessionProcessor.create({
           assistantMessage: assistant,
@@ -156,11 +169,17 @@ export namespace SessionPrompt {
           agentRef: agent,
         })
         lastResult = await processor.process()
+        if (lastResult.info.role !== "assistant") {
+          throw new Error("Expected assistant result")
+        }
 
-        publish(messageFinished, {
+        await publish(messageFinished, {
           sessionID,
           messageID: lastResult.info.id,
           role: "assistant",
+          completedAt: lastResult.info.time.completed ?? Date.now(),
+          finishReason: lastResult.info.finish,
+          parentUserMessageID: lastResult.info.parentID,
         })
         await ensureTitleIfNeeded(sessionID, messages, lastResult)
       }
@@ -210,7 +229,12 @@ export namespace SessionPrompt {
 
     await Session.updateMessage(info)
     await Session.updatePart(part)
-    void publish(messageCreated, { sessionID: input.sessionID, messageID: info.id, role: "user" })
+    await publish(messageCreated, {
+      sessionID: input.sessionID,
+      messageID: info.id,
+      role: "user",
+      createdAt: info.time.created,
+    })
     return { info, parts: [part] }
   }
 

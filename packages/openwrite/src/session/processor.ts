@@ -6,6 +6,8 @@ import { LLM } from "@/session/llm"
 import type { ModelMessage } from "ai"
 import { Log } from "@/util/log"
 import type { Agent } from "@/agent/types"
+import { publish } from "@/bus"
+import { messageDelta } from "@/bus/events"
 
 type CreateInput = {
   assistantMessage: Message.Assistant
@@ -71,6 +73,14 @@ export const create = (input: CreateInput) => {
             }
             currentText.text += value.text
             await Session.updatePart(currentText)
+            if (value.text.length > 0) {
+              await publish(messageDelta, {
+                sessionID: input.sessionID,
+                messageID: input.assistantMessage.id,
+                parentUserMessageID: input.user.id,
+                delta: value.text,
+              })
+            }
             break
           }
           case "text-end": {

@@ -2,7 +2,6 @@ import { proxyErrorResponse, proxyFetch, relayStreamResponse } from "@/lib/openw
 
 const PROJECT_ID_HEADER = "x-project-id"
 
-// Backward-compatible alias for /events/fs.
 export async function GET(request: Request) {
   const url = new URL(request.url)
   const projectID = url.searchParams.get("project_id")?.trim() ?? ""
