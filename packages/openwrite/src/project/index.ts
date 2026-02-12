@@ -28,6 +28,7 @@ export namespace Project {
 
   export const Info = z.object({
     id: Identifier.schema("project"),
+    project_slug: z.string(),
     title: z.string(),
     curr_session_id: z.string(),
     curr_agent_name: z.string(),
@@ -38,6 +39,14 @@ export namespace Project {
     }),
   })
   export type Info = z.infer<typeof Info>
+
+  function ensureProjectSlug(info: Info): Info {
+    if (info.project_slug?.trim()) return info
+    return {
+      ...info,
+      project_slug: info.id,
+    }
+  }
 
   export function defaultTitle() {
     return `New project - ${new Date().toISOString()}`
@@ -57,8 +66,10 @@ export namespace Project {
     curr_agent_name: string
     phase?: Phase
   }) {
+    const id = Identifier.ascending("project")
     const info: Info = {
-      id: Identifier.ascending("project"),
+      id,
+      project_slug: id,
       title: input.title ?? defaultTitle(),
       curr_session_id: input.curr_session_id ?? "",
       curr_agent_name: input.curr_agent_name,
@@ -74,11 +85,24 @@ export namespace Project {
   }
 
   export async function get(projectID: string) {
-    return Storage.read<Info>(["project", projectID])
+    const info = await Storage.read<Info>(["project", projectID])
+    return ensureProjectSlug(info)
+  }
+
+  export async function list() {
+    const ids = await Storage.list(["project"])
+    const all = await Promise.all(
+      ids.map(async (segments) => ensureProjectSlug(await Storage.read<Info>(segments))),
+    )
+    all.sort((a, b) => b.time.updated - a.time.updated)
+    return all
   }
 
   export async function update(projectID: string, editor: (draft: Info) => void) {
     return Storage.update<Info>(["project", projectID], (draft) => {
+      if (!draft.project_slug?.trim()) {
+        draft.project_slug = draft.id
+      }
       editor(draft)
       draft.time.updated = Date.now()
     })

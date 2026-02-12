@@ -1,14 +1,68 @@
+"use client";
 
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { X, FileCode2, Pin, History } from "lucide-react";
 import { FileNode } from "../types";
+import { fetchFileContent, type OpenwriteFsReadResult } from "@/lib/openwrite-client";
 
 interface FilePreviewPanelProps {
+  projectID: string | null;
   file: FileNode | null;
   onClose: () => void;
 }
 
-export function FilePreviewPanel({ file, onClose }: FilePreviewPanelProps) {
+export function FilePreviewPanel({ projectID, file, onClose }: FilePreviewPanelProps) {
+  const [content, setContent] = useState("");
+  const [meta, setMeta] = useState<OpenwriteFsReadResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!projectID || !file || file.type === "folder") {
+      setContent("");
+      setMeta(null);
+      setError(null);
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadFile = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await fetchFileContent({
+          projectID,
+          path: file.path,
+          offset: 0,
+          limit: 2000,
+        });
+        if (!active) return;
+        setMeta(result);
+        setContent(result.content);
+      } catch (e) {
+        if (!active) return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadFile();
+    return () => {
+      active = false;
+    };
+  }, [projectID, file]);
+
+  const lines = useMemo(() => {
+    if (!content) return [""];
+    return content.split(/\r?\n/);
+  }, [content]);
+
   if (!file) return null;
 
   return (
@@ -47,25 +101,22 @@ export function FilePreviewPanel({ file, onClose }: FilePreviewPanelProps) {
         <div className="flex min-h-full">
             {/* Line Numbers */}
             <div className="w-12 bg-[#FAFAF9] border-r border-stone-100 flex flex-col items-end pr-3 py-4 text-stone-300 select-none text-xs">
-                {Array.from({length: 20}).map((_, i) => <div key={i}>{i+1}</div>)}
+                {lines.map((_, i) => <div key={i}>{i + 1}</div>)}
             </div>
             {/* Code */}
-            <div className="flex-1 py-4 px-5 whitespace-pre-wrap">
-                <span className="text-purple-600">import</span> React <span className="text-purple-600">from</span> <span className="text-green-600">&apos;react&apos;</span>;
-                {'\n\n'}
-                <span className="text-purple-600">export const</span> <span className="text-blue-600">Button</span> = ({'{'} children {'}'}) ={'>'} {'{'}
-                {'\n'}
-                {'  '}return (
-                {'\n'}
-                {'    '}&lt;<span className="text-red-600">button</span> className=<span className="text-green-600">&quot;px-4 py-2 bg-blue-500 rounded&quot;</span>&gt;
-                {'\n'}
-                {'      '}{'{'}children{'}'}
-                {'\n'}
-                {'    '}&lt;/<span className="text-red-600">button</span>&gt;
-                {'\n'}
-                {'  '});
-                {'\n'}
-                {'}'};
+            <div className="flex-1 py-4 px-5">
+              {loading && <div className="text-stone-400">Loading file...</div>}
+              {error && <div className="text-red-500">Failed to load file: {error}</div>}
+              {!loading && !error && (
+                <>
+                  <pre className="whitespace-pre-wrap break-words">{content || ""}</pre>
+                  {meta?.truncated && (
+                    <div className="mt-2 text-xs text-stone-400">
+                      Truncated at {meta.limit} lines ({meta.totalLines} total lines).
+                    </div>
+                  )}
+                </>
+              )}
             </div>
         </div>
       </div>

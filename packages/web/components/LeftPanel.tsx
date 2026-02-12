@@ -3,7 +3,7 @@ import React from "react";
 import { FolderGit2, ChevronLeft, ChevronRight, LayoutGrid, Settings, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { WorkspaceTree } from "./WorkspaceTree";
-import { MOCK_PROGRESS, MOCK_PROJECTS } from "../mock/data";
+import { MOCK_PROGRESS } from "../mock/data";
 import { FileNode } from "../types";
 
 interface LeftPanelProps {
@@ -11,9 +11,30 @@ interface LeftPanelProps {
   onToggleCollapse: () => void;
   onFileSelect: (file: FileNode) => void;
   selectedFileId?: string;
+  projectID: string | null;
+  projectTitle: string;
+  projectLoading: boolean;
+  projectError: string | null;
 }
 
-export function LeftPanel({ collapsed, onToggleCollapse, onFileSelect, selectedFileId }: LeftPanelProps) {
+export function LeftPanel({
+  collapsed,
+  onToggleCollapse,
+  onFileSelect,
+  selectedFileId,
+  projectID,
+  projectTitle,
+  projectLoading,
+  projectError,
+}: LeftPanelProps) {
+  const projectSubtitle = projectError
+    ? "backend unavailable"
+    : projectLoading
+      ? "loading projects..."
+      : projectID
+        ? projectID
+        : "project unavailable";
+
   return (
     <div className="flex flex-col h-full w-full bg-[#FAFAF9]">
       
@@ -26,8 +47,8 @@ export function LeftPanel({ collapsed, onToggleCollapse, onFileSelect, selectedF
                         <FolderGit2 size={18} />
                     </div>
                     <div className="flex flex-col overflow-hidden">
-                        <span className="text-sm font-bold text-stone-800 leading-tight mb-0.5 truncate">{MOCK_PROJECTS[0].name}</span>
-                        <span className="text-xs text-stone-400 leading-none truncate">main • updated 2h ago</span>
+                        <span className="text-sm font-bold text-stone-800 leading-tight mb-0.5 truncate">{projectTitle}</span>
+                        <span className="text-xs text-stone-400 leading-none truncate">{projectSubtitle}</span>
                     </div>
                </div>
            )}
@@ -70,7 +91,7 @@ export function LeftPanel({ collapsed, onToggleCollapse, onFileSelect, selectedF
               <span>Files</span>
               <LayoutGrid size={14} className="cursor-pointer hover:text-stone-600"/>
             </div>
-            <WorkspaceTree onSelect={onFileSelect} selectedId={selectedFileId} />
+            <WorkspaceTree projectID={projectID} onSelect={onFileSelect} selectedId={selectedFileId} />
           </>
         )}
         {collapsed && (

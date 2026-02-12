@@ -1,11 +1,11 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Folder, FolderOpen, FileCode2, File, ChevronRight, ChevronDown } from "lucide-react";
 import { FileNode } from "../types";
 import { cn } from "../lib/utils";
-import { MOCK_FILE_TREE } from "../mock/data";
+import { fetchFileTree, type OpenwriteFsNode } from "@/lib/openwrite-client";
 
 const FileIcon = ({ name }: { name: string }) => {
     if (name.endsWith('tsx') || name.endsWith('ts')) return <FileCode2 size={16} className="text-blue-500" />;
@@ -75,10 +75,72 @@ const TreeNode = ({ node, level, onSelect, selectedId }: { node: FileNode, level
   );
 };
 
-export function WorkspaceTree({ onSelect, selectedId }: { onSelect: (node: FileNode) => void, selectedId?: string }) {
+function mapFsNode(node: OpenwriteFsNode): FileNode {
+  return {
+    id: node.path,
+    name: node.name,
+    type: node.kind === "dir" ? "folder" : "file",
+    path: node.path,
+    children: node.children?.map(mapFsNode),
+  };
+}
+
+export function WorkspaceTree({
+  projectID,
+  onSelect,
+  selectedId,
+}: {
+  projectID: string | null
+  onSelect: (node: FileNode) => void
+  selectedId?: string
+}) {
+  const [nodes, setNodes] = useState<FileNode[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    if (!projectID) {
+      setNodes([]);
+      setLoading(false);
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadTree = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const root = await fetchFileTree({ projectID, depth: 6 });
+        if (!active) return;
+        const children = root.children?.map(mapFsNode) ?? [];
+        setNodes(children);
+      } catch (e) {
+        if (!active) return;
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void loadTree();
+    return () => {
+      active = false;
+    };
+  }, [projectID]);
+
   return (
     <div className="mt-1 pb-10">
-      {MOCK_FILE_TREE.map((node) => (
+      {!projectID && <div className="px-5 py-3 text-xs text-stone-400">Waiting for project...</div>}
+      {projectID && loading && <div className="px-5 py-3 text-xs text-stone-400">Loading files...</div>}
+      {projectID && error && <div className="px-5 py-3 text-xs text-red-500">Failed to load files: {error}</div>}
+      {projectID && !loading && !error && nodes.length === 0 && (
+        <div className="px-5 py-3 text-xs text-stone-400">Workspace is empty.</div>
+      )}
+      {nodes.map((node) => (
         <TreeNode key={node.id} node={node} level={0} onSelect={onSelect} selectedId={selectedId} />
       ))}
     </div>

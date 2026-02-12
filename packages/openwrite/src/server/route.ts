@@ -27,7 +27,10 @@ const PROJECT_ID_HEADER = "x-project-id"
 
 export function setupRoutes(app: Hono) {
   app.use("*", async (c, next) => {
-    if (c.req.method === "POST" && c.req.path === "/api/project") {
+    if (
+      (c.req.method === "POST" && c.req.path === "/api/project")
+      || (c.req.method === "GET" && c.req.path === "/api/projects")
+    ) {
       return next()
     }
     const projectId = c.req.header(PROJECT_ID_HEADER) ?? ""
@@ -157,6 +160,16 @@ export function setupRoutes(app: Hono) {
         draft.curr_session_id = initialSession.id
       })
       return c.json({ project: ready })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+  })
+
+  app.get("/api/projects", async (c) => {
+    try {
+      const projects = await Project.list()
+      return c.json({ projects })
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error"
       return c.json({ error: message }, 500)

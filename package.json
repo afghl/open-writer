@@ -20,7 +20,13 @@
     }
   },
   "scripts": {
-    "dev": "bun run --cwd packages/openwrite dev",
+    "dev": "bun run dev:all",
+    "dev:openwrite": "bun run --cwd packages/openwrite dev",
+    "dev:web": "bun run --cwd packages/web dev",
+    "dev:all": "bun run dev:openwrite & bun run dev:web",
+    "start:openwrite": "bun run --cwd packages/openwrite start",
+    "start:web": "bun run --cwd packages/web start",
+    "start:all": "bun run start:openwrite & bun run start:web",
     "test": "bun run --cwd packages/openwrite test",
     "typecheck": "bun run --cwd packages/openwrite typecheck"
   },
