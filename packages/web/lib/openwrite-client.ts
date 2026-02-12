@@ -59,6 +59,7 @@ export type OpenwriteTextPart = {
   type: "text"
   text: string
   synthetic?: boolean
+  kind?: "text" | "tool"
 }
 
 export type OpenwriteMessageWithParts = {

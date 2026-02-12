@@ -23,14 +23,13 @@ function messageText(message: OpenwriteMessageWithParts) {
 const TOOL_STEP_HINT = "Tool step completed.";
 
 function mapToDisplayMessage(message: OpenwriteMessageWithParts): DisplayMessage {
-  const syntheticOnly =
-    message.parts.length > 0 && message.parts.every((part) => part.synthetic === true);
+  const kind = message.parts.some((part) => part.kind === "tool") ? "tool" : "text";
   return {
     id: message.info.id,
     role: message.info.role,
     text: messageText(message),
     createdAt: message.info.time.created,
-    weak: syntheticOnly,
+    kind,
   };
 }
 
@@ -254,7 +253,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
             ...existing,
             text: existing.text + event.delta,
             pending: true,
-            weak: false,
+            kind: "text",
           };
           return next;
         });
@@ -273,7 +272,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
               text: TOOL_STEP_HINT,
               createdAt: event.completedAt,
               pending: false,
-              weak: true,
+              kind: "tool",
             });
             return next;
           }
@@ -284,7 +283,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
             text: hasText ? existing.text : TOOL_STEP_HINT,
             createdAt: existing.createdAt || event.completedAt,
             pending: false,
-            weak: hasText ? existing.weak : true,
+            kind: hasText ? "text" : "tool",
           };
           return next;
         });
@@ -355,7 +354,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
           if (msg.role === "user") {
             return <UserMessageBox key={msg.id} message={msg} />;
           }
-          if (msg.weak === true) {
+          if (msg.kind === "tool") {
             return <ToolMessageBox key={msg.id} message={msg} />;
           }
           return <AssistantMessageBox key={msg.id} message={msg} />;

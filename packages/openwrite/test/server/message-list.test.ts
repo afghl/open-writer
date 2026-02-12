@@ -5,6 +5,7 @@ import os from "node:os"
 import path from "node:path"
 
 const TOOL_STEP_HINT = "Tool step completed."
+const TOOL_LABEL_PREFIX = "Used tool: "
 
 let namespaceRoot = ""
 let projectID = ""
@@ -80,6 +81,58 @@ beforeAll(async () => {
     },
   })
 
+  const userMessageIDNoName = "message_user_tool_noname"
+  const assistantMessageIDNoName = "message_assistant_tool_noname"
+
+  await Session.updateMessage({
+    id: userMessageIDNoName,
+    role: "user",
+    sessionID: session.id,
+    agent: "plan",
+    time: {
+      created: now + 3,
+    },
+  })
+  await Session.updatePart({
+    id: "part_user_tool_noname",
+    sessionID: session.id,
+    messageID: userMessageIDNoName,
+    type: "text",
+    text: "run another tool",
+  })
+
+  await Session.updateMessage({
+    id: assistantMessageIDNoName,
+    role: "assistant",
+    sessionID: session.id,
+    parentID: userMessageIDNoName,
+    agent: "plan",
+    finish: "tool-calls",
+    time: {
+      created: now + 4,
+      completed: now + 5,
+    },
+  })
+  await Session.updatePart({
+    id: "part_assistant_tool_noname",
+    sessionID: session.id,
+    messageID: assistantMessageIDNoName,
+    type: "tool",
+    callID: "call_tool_noname",
+    tool: "",
+    state: {
+      status: "completed",
+      input: { path: "README.md" },
+      output: "ok",
+      title: "read",
+      metadata: {},
+      time: {
+        start: now + 4,
+        end: now + 5,
+      },
+    },
+  })
+
   projectID = project.id
   sessionID = session.id
 })
@@ -90,7 +143,7 @@ afterAll(async () => {
   }
 })
 
-test("messages API keeps a synthetic text placeholder for tool-only assistant messages", async () => {
+test("messages API surfaces tool names and fallback placeholder for tool-only assistant messages", async () => {
   const { setupRoutes } = await import("../../src/server/route")
   const app = new Hono()
   setupRoutes(app)
@@ -121,10 +174,20 @@ test("messages API keeps a synthetic text placeholder for tool-only assistant me
 
   expect(payload.sessionID).toBe(sessionID)
 
-  const assistant = payload.messages.find((message) => message.info.role === "assistant")
-  expect(assistant).toBeDefined()
-  expect(assistant?.parts).toHaveLength(1)
-  expect(assistant?.parts[0]?.type).toBe("text")
-  expect(assistant?.parts[0]?.text).toBe(TOOL_STEP_HINT)
-  expect(assistant?.parts[0]?.synthetic).toBe(true)
+  const assistants = payload.messages.filter((message) => message.info.role === "assistant")
+  expect(assistants).toHaveLength(2)
+
+  const withName = assistants.find((message) => message.info.id === "message_assistant_tool_only")
+  expect(withName).toBeDefined()
+  expect(withName?.parts).toHaveLength(1)
+  expect(withName?.parts[0]?.type).toBe("text")
+  expect(withName?.parts[0]?.text).toBe(`${TOOL_LABEL_PREFIX}read`)
+  expect(withName?.parts[0]?.synthetic).toBe(true)
+
+  const fallback = assistants.find((message) => message.info.id === "message_assistant_tool_noname")
+  expect(fallback).toBeDefined()
+  expect(fallback?.parts).toHaveLength(1)
+  expect(fallback?.parts[0]?.type).toBe("text")
+  expect(fallback?.parts[0]?.text).toBe(TOOL_STEP_HINT)
+  expect(fallback?.parts[0]?.synthetic).toBe(true)
 })

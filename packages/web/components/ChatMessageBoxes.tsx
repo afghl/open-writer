@@ -78,7 +78,7 @@ export type DisplayMessage = {
   text: string;
   createdAt: number;
   pending?: boolean;
-  weak?: boolean;
+  kind?: "text" | "tool";
 };
 
 export function UserMessageBox({ message }: { message: DisplayMessage }) {
@@ -108,14 +108,14 @@ export function AssistantMessageBox({ message }: { message: DisplayMessage }) {
   return (
     <div className="flex w-full max-w-3xl mx-auto justify-start">
       <div className="flex gap-4 w-full flex-row">
-        {/* <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border shadow-sm mt-1 bg-white border-stone-200 text-orange-600">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border shadow-sm mt-1 bg-white border-stone-200 text-orange-600">
           <Zap size={16} fill="currentColor" />
-        </div> */}
+        </div>
 
         <div className="flex flex-col gap-1 min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
-            {/* <span className="text-sm font-bold text-stone-700">OpenWrite Agent</span> */}
-            {/* <MessageTime timestamp={message.createdAt} /> */}
+            <span className="text-sm font-bold text-stone-700">Assistant</span>
+            <MessageTime timestamp={message.createdAt} />
           </div>
 
           <div className="leading-7 text-base md:text-medium px-0 py-0 text-stone-800">
@@ -135,10 +135,17 @@ export function AssistantMessageBox({ message }: { message: DisplayMessage }) {
 
 export function ToolMessageBox({ message }: { message: DisplayMessage }) {
   return (
-    <div className="flex w-full max-w-3xl mx-auto justify-start [&:not(:first-child)]:!mt-2 -mb-6">
-      <div className="flex w-full flex-row">
+    <div className="flex w-full max-w-3xl mx-auto justify-start">
+      <div className="flex gap-4 w-full flex-row">
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 border shadow-sm mt-1 bg-white border-stone-200 text-orange-600">
+          <Zap size={16} fill="currentColor" />
+        </div>
         <div className="flex flex-col gap-1 min-w-0 flex-1">
-          <div className="self-start block w-fit max-w-full py-2 text-[13px] leading-5 text-stone-400">
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-bold text-stone-600">Tool</span>
+            <MessageTime timestamp={message.createdAt} />
+          </div>
+          <div className="self-start block w-fit max-w-full py-0 text-[13px] leading-5 text-stone-400">
             <span>{message.text}</span>
           </div>
         </div>

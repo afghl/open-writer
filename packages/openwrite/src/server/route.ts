@@ -482,6 +482,26 @@ export function setupRoutes(app: Hono) {
 
 function filterRenderableMessages(messages: Message.WithParts[]) {
   const TOOL_STEP_HINT = "Tool step completed."
+  const TOOL_STEP_PREFIX = "Used tool:"
+  const TOOL_STEPS_PREFIX = "Used tools:"
+  const getToolNames = (parts: Message.Part[]) => {
+    const names = parts
+      .filter((part): part is Message.ToolPart => part.type === "tool")
+      .map((part) => part.tool.trim())
+      .filter((name) => name.length > 0)
+    return Array.from(new Set(names))
+  }
+
+  const toToolSummaryText = (toolNames: string[]) => {
+    if (toolNames.length === 0) {
+      return TOOL_STEP_HINT
+    }
+    if (toolNames.length === 1) {
+      return `${TOOL_STEP_PREFIX} ${toolNames[0]}`
+    }
+    return `${TOOL_STEPS_PREFIX} ${toolNames.join(", ")}`
+  }
+
   return messages
     .map((message) => ({
       ...message,
@@ -496,14 +516,16 @@ function filterRenderableMessages(messages: Message.WithParts[]) {
           return textParts
         }
         if (message.info.role === "assistant" && message.parts.some((part) => part.type === "tool")) {
+          const toolNames = getToolNames(message.parts)
           return [
             {
               id: `${message.info.id}_tool_summary`,
               sessionID: message.info.sessionID,
               messageID: message.info.id,
               type: "text",
-              text: TOOL_STEP_HINT,
+              text: toToolSummaryText(toolNames),
               synthetic: true,
+              kind: "tool",
             },
           ]
         }

@@ -12,6 +12,7 @@ export namespace Message {
     type: z.literal("text"),
     text: z.string(),
     synthetic: z.boolean().optional(),
+    kind: z.enum(["text", "tool"]).optional(),
     time: z
       .object({
         start: z.number(),
