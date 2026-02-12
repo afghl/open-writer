@@ -4,11 +4,15 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "skipLibCheck": true,
     "types": [
-      "bun"
+      "bun",
+      "node"
     ],
     "lib": [
-      "ESNext"
+      "ESNext",
+      "DOM",
+      "DOM.Iterable"
     ],
     "paths": {
       "@/*": [

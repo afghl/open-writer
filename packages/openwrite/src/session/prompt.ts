@@ -98,14 +98,6 @@ export namespace SessionPrompt {
           Log.Default.info("Has pending tool", { hasPendingTool })
           if (hasPendingTool) {
             lastResult = lastAssistant
-            await publish(messageFinished, {
-              sessionID,
-              messageID: lastAssistant.info.id,
-              role: "assistant",
-              completedAt: lastAssistant.info.time.completed ?? Date.now(),
-              finishReason: lastAssistant.info.finish,
-              parentUserMessageID: lastAssistant.info.parentID,
-            })
             break
           }
 
@@ -115,14 +107,6 @@ export namespace SessionPrompt {
             lastAssistant.info.id > lastUser.info.id
           ) {
             lastResult = lastAssistant
-            await publish(messageFinished, {
-              sessionID,
-              messageID: lastAssistant.info.id,
-              role: "assistant",
-              completedAt: lastAssistant.info.time.completed ?? Date.now(),
-              finishReason: lastAssistant.info.finish,
-              parentUserMessageID: lastAssistant.info.parentID,
-            })
             break
           }
         }

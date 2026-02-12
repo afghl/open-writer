@@ -1,4 +1,5 @@
 import { expect, test, mock } from "bun:test"
+import type { Message as MessageType } from "../../src/session/message"
 
 type ConvertCall = {
   messages: unknown
@@ -46,7 +47,7 @@ const createPartBase = (messageID: string, id: string) => ({
 test("filters user text parts and ignores empty/synthetic", () => {
   resetCalls()
   const userId = "user-1"
-  const input: Message.WithParts[] = [
+  const input: MessageType.WithParts[] = [
     {
       info: createUserInfo(userId),
       parts: [
@@ -95,7 +96,7 @@ test("keeps assistant parts and drops step-start-only messages", () => {
   resetCalls()
   const assistantId = "assistant-1"
   const stepOnlyId = "assistant-2"
-  const input: Message.WithParts[] = [
+  const input: MessageType.WithParts[] = [
     {
       info: createAssistantInfo(stepOnlyId),
       parts: [
@@ -162,7 +163,7 @@ test("keeps assistant parts and drops step-start-only messages", () => {
 test("maps tool parts and provides tool output conversion", () => {
   resetCalls()
   const assistantId = "assistant-3"
-  const input: Message.WithParts[] = [
+  const input: MessageType.WithParts[] = [
     {
       info: createAssistantInfo(assistantId),
       parts: [
@@ -210,10 +211,7 @@ test("maps tool parts and provides tool output conversion", () => {
     },
   ]
 
-  const result = Message.toModelMessages(input) as {
-    messages: unknown
-    options: { tools?: Record<string, { toModelOutput?: (output: unknown) => unknown }> }
-  }
+  Message.toModelMessages(input)
 
   expect(convertCalls.length).toBe(1)
   expect(convertCalls[0]?.messages).toEqual([
@@ -249,7 +247,10 @@ test("maps tool parts and provides tool output conversion", () => {
     },
   ])
 
-  const tools = result.options.tools ?? {}
+  const options = convertCalls[0]?.options as
+    | { tools?: Record<string, { toModelOutput?: (output: unknown) => unknown }> }
+    | undefined
+  const tools = options?.tools ?? {}
   expect(Object.keys(tools).sort()).toEqual(["search", "weather"])
   expect(tools.weather?.toModelOutput?.("ok")).toEqual({ type: "text", value: "ok" })
   expect(tools.search?.toModelOutput?.({ data: true })).toEqual({ type: "json", value: { data: true } })

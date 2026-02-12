@@ -176,7 +176,7 @@ export function setupRoutes(app: Hono) {
 
     let rootUserMessageID = ""
     let latestAssistantMessageID = ""
-    let doneSent = false
+    const emittedDoneAssistantIDs = new Set<string>()
 
     return streamSSE(c, async (stream) => {
       const keepalive = setInterval(() => {
@@ -194,6 +194,23 @@ export function setupRoutes(app: Hono) {
         rootUserMessageID.length > 0 && parentUserMessageID === rootUserMessageID
       const isTerminalAssistantFinish = (finish?: string) =>
         finish !== "tool-calls" && finish !== "unknown"
+      const emitDoneOnce = async (payload: {
+        sessionID: string
+        assistantMessageID: string
+        completedAt: number
+        finishReason?: string
+      }) => {
+        const finishReason = payload.finishReason ?? "stop"
+        if (!isTerminalAssistantFinish(finishReason)) return
+        if (emittedDoneAssistantIDs.has(payload.assistantMessageID)) return
+        emittedDoneAssistantIDs.add(payload.assistantMessageID)
+        await writeEvent("done", {
+          sessionID: payload.sessionID,
+          assistantMessageID: payload.assistantMessageID,
+          completedAt: payload.completedAt,
+          finishReason,
+        })
+      }
 
       const unsubscribeCreated = subscribe(messageCreated, async (event) => {
         const payload = event.properties
@@ -238,13 +255,11 @@ export function setupRoutes(app: Hono) {
         if (payload.sessionID !== sessionID || payload.role !== "assistant") return
         if (!shouldHandleAssistant(payload.parentUserMessageID)) return
         latestAssistantMessageID = payload.messageID
-        if (!isTerminalAssistantFinish(payload.finishReason)) return
-        doneSent = true
-        await writeEvent("done", {
+        await emitDoneOnce({
           sessionID: payload.sessionID,
           assistantMessageID: payload.messageID,
           completedAt: payload.completedAt,
-          finishReason: payload.finishReason ?? "stop",
+          finishReason: payload.finishReason,
         })
       })
 
@@ -259,13 +274,13 @@ export function setupRoutes(app: Hono) {
           text: parsed.data.text,
           agent: resolvedAgent,
         })
-        if (!doneSent && result.info.role === "assistant") {
+        if (result.info.role === "assistant") {
           latestAssistantMessageID = result.info.id
-          await writeEvent("done", {
+          await emitDoneOnce({
             sessionID: result.info.sessionID,
             assistantMessageID: result.info.id,
             completedAt: result.info.time.completed ?? Date.now(),
-            finishReason: result.info.finish ?? "stop",
+            finishReason: result.info.finish,
           })
         }
       } catch (error) {
