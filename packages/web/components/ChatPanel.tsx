@@ -1,10 +1,14 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Hash, Zap, Plus, Paperclip, ArrowUp, Bot } from "lucide-react";
+import { Hash, Plus, Paperclip, ArrowUp, Bot } from "lucide-react";
 import { cn } from "../lib/utils";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
+import {
+  AssistantMessageBox,
+  ToolMessageBox,
+  UserMessageBox,
+  type DisplayMessage,
+} from "./ChatMessageBoxes";
 import {
   listMessages,
   sendMessageStream,
@@ -12,33 +16,9 @@ import {
   type OpenwriteMessageWithParts,
 } from "@/lib/openwrite-client";
 
-const timeFormatter = new Intl.DateTimeFormat("en-US", {
-  hour: "2-digit",
-  minute: "2-digit",
-  hour12: false,
-  timeZone: "UTC",
-});
-
-function MessageTime({ timestamp }: { timestamp: number }) {
-  return (
-    <span className="text-xs text-stone-300">
-      {timeFormatter.format(new Date(timestamp))}
-    </span>
-  );
-}
-
 function messageText(message: OpenwriteMessageWithParts) {
   return message.parts.map((part) => part.text).join("").trim();
 }
-
-type DisplayMessage = {
-  id: string;
-  role: "user" | "assistant";
-  text: string;
-  createdAt: number;
-  pending?: boolean;
-  weak?: boolean;
-};
 
 const TOOL_STEP_HINT = "Tool step completed.";
 
@@ -75,57 +55,6 @@ function mergeMessageLists(
   merged.sort((a, b) => (a.info.id > b.info.id ? 1 : -1));
   return merged;
 }
-
-const markdownComponents: Components = {
-  p({ children }) {
-    return <p className="mb-3 last:mb-0">{children}</p>;
-  },
-  ul({ children }) {
-    return <ul className="mb-3 list-disc pl-6 space-y-1">{children}</ul>;
-  },
-  ol({ children }) {
-    return <ol className="mb-3 list-decimal pl-6 space-y-1">{children}</ol>;
-  },
-  li({ children }) {
-    return <li>{children}</li>;
-  },
-  blockquote({ children }) {
-    return <blockquote className="my-3 border-l-2 border-stone-300 pl-3 text-stone-600">{children}</blockquote>;
-  },
-  a({ children, className, href }) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noreferrer"
-        className={cn("text-orange-700 underline underline-offset-2", className)}
-      >
-        {children}
-      </a>
-    );
-  },
-  pre({ children }) {
-    return (
-      <pre className="my-3 overflow-x-auto rounded-lg bg-stone-100 px-3 py-2 text-sm leading-6">
-        {children}
-      </pre>
-    );
-  },
-  code({ className, children, ...props }) {
-    const hasLanguage = typeof className === "string" && className.includes("language-");
-    return (
-      <code
-        {...props}
-        className={cn(
-          "font-mono",
-          hasLanguage ? className : "rounded bg-stone-100 px-1 py-0.5 text-[0.92em]",
-        )}
-      >
-        {children}
-      </code>
-    );
-  },
-};
 
 type ChatPanelProps = {
   projectID: string;
@@ -423,54 +352,13 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
           <div className="max-w-3xl mx-auto text-sm text-stone-400">No messages yet.</div>
         )}
         {displayMessages.map((msg) => {
-          const isUser = msg.role === "user";
-          const isWeakAssistantMessage = !isUser && msg.weak === true;
-          return (
-            <div
-              key={msg.id}
-              className={cn(
-                "flex w-full max-w-3xl mx-auto",
-                isUser ? "justify-end" : "justify-start",
-              )}
-            >
-              <div className={cn("flex gap-4 w-full", isUser ? "flex-row-reverse" : "flex-row")}>
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center shrink-0 border shadow-sm mt-1",
-                  !isUser ? "bg-white border-stone-200 text-orange-600" : "bg-stone-800 border-stone-800 text-white",
-                )}>
-                  {!isUser ? <Zap size={16} fill="currentColor" /> : <span className="text-xs font-bold">U</span>}
-                </div>
-
-                <div className={cn("flex flex-col gap-1 min-w-0 flex-1", isUser && "items-end")}>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-sm font-bold text-stone-700">{isUser ? "You" : "OpenWrite Agent"}</span>
-                    <MessageTime timestamp={msg.createdAt} />
-                  </div>
-
-                  <div className={cn(
-                    "leading-7 text-base md:text-medium",
-                    isUser
-                      ? "px-5 py-3 rounded-2xl bg-[#FAFAF9] border border-stone-200 text-stone-800 rounded-tr-sm shadow-sm"
-                      : isWeakAssistantMessage
-                        ? "px-0 py-0 text-stone-400 text-sm leading-6"
-                        : "px-0 py-0 text-stone-800",
-                  )}>
-                    {isUser ? (
-                      msg.text
-                    ) : msg.text.length === 0 ? (
-                      <span className="text-stone-400">Thinking...</span>
-                    ) : isWeakAssistantMessage ? (
-                      <span>{msg.text}</span>
-                    ) : (
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                        {msg.text}
-                      </ReactMarkdown>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          );
+          if (msg.role === "user") {
+            return <UserMessageBox key={msg.id} message={msg} />;
+          }
+          if (msg.weak === true) {
+            return <ToolMessageBox key={msg.id} message={msg} />;
+          }
+          return <AssistantMessageBox key={msg.id} message={msg} />;
         })}
         <div className="h-4" />
       </div>
