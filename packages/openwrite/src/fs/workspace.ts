@@ -57,10 +57,7 @@ function sortNodes(nodes: FsNode[]) {
 
 async function buildNode(logicalPath: string, projectID: string, depth: number): Promise<FsNode> {
   const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(logicalPath, projectID)
-  console.log("resolvedPath", resolvedPath)
-  console.log("logicalNamespacePath", logicalNamespacePath)
   const stat = await fs.stat(resolvedPath)
-  console.log("stat", stat)
   const node: FsNode = {
     name: path.basename(resolvedPath) || "workspace",
     path: logicalNamespacePath,
@@ -68,7 +65,6 @@ async function buildNode(logicalPath: string, projectID: string, depth: number):
     size: stat.size,
     mtimeMs: stat.mtimeMs,
   }
-  console.log("node", node)
 
   if (node.kind === "dir" && depth > 0) {
     const entries = await fs.readdir(resolvedPath, { withFileTypes: true })
