@@ -28,6 +28,7 @@ export default function AppShell({ projectSlug }: AppShellProps) {
   const [projectError, setProjectError] = useState<string | null>(null);
   const [emptyProjects, setEmptyProjects] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [fsRefreshTick, setFsRefreshTick] = useState(0);
   const projectID = project?.id ?? null;
   const projectTitle = project?.title ?? "OpenWrite Project";
 
@@ -78,6 +79,27 @@ export default function AppShell({ projectSlug }: AppShellProps) {
   useEffect(() => {
     setSelectedFile(null);
     setPreviewCollapsed(true);
+  }, [projectID]);
+
+  useEffect(() => {
+    if (!projectID) return;
+
+    const source = new EventSource(`/events?project_id=${encodeURIComponent(projectID)}`);
+    const onFsChange = () => {
+      setFsRefreshTick((tick) => tick + 1);
+    };
+    const fsEventNames = ["fs.created", "fs.updated", "fs.deleted", "fs.moved"];
+
+    for (const eventName of fsEventNames) {
+      source.addEventListener(eventName, onFsChange);
+    }
+
+    return () => {
+      for (const eventName of fsEventNames) {
+        source.removeEventListener(eventName, onFsChange);
+      }
+      source.close();
+    };
   }, [projectID]);
 
   const handleCreateProject = async () => {
@@ -134,6 +156,7 @@ export default function AppShell({ projectSlug }: AppShellProps) {
           projectTitle={projectTitle}
           projectLoading={projectLoading}
           projectError={projectError}
+          fsRefreshTick={fsRefreshTick}
         />
       </aside>
 
@@ -146,6 +169,7 @@ export default function AppShell({ projectSlug }: AppShellProps) {
       >
         <FilePreviewPanel 
           projectID={projectID}
+          fsRefreshTick={fsRefreshTick}
           file={selectedFile} 
           onClose={handleClosePreview} 
         />
@@ -176,7 +200,7 @@ export default function AppShell({ projectSlug }: AppShellProps) {
             Loading project...
           </div>
         ) : (
-          <ChatPanel />
+          <ChatPanel projectID={projectID} />
         )}
       </main>
 

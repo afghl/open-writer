@@ -7,11 +7,12 @@ import { fetchFileContent, type OpenwriteFsReadResult } from "@/lib/openwrite-cl
 
 interface FilePreviewPanelProps {
   projectID: string | null;
+  fsRefreshTick: number;
   file: FileNode | null;
   onClose: () => void;
 }
 
-export function FilePreviewPanel({ projectID, file, onClose }: FilePreviewPanelProps) {
+export function FilePreviewPanel({ projectID, fsRefreshTick, file, onClose }: FilePreviewPanelProps) {
   const [content, setContent] = useState("");
   const [meta, setMeta] = useState<OpenwriteFsReadResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -56,7 +57,7 @@ export function FilePreviewPanel({ projectID, file, onClose }: FilePreviewPanelP
     return () => {
       active = false;
     };
-  }, [projectID, file]);
+  }, [projectID, file, fsRefreshTick]);
 
   const lines = useMemo(() => {
     if (!content) return [""];

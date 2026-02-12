@@ -29,6 +29,43 @@ export type OpenwriteFsReadResult = {
   limit: number
 }
 
+export type OpenwriteMessageInfo =
+  | {
+    id: string
+    sessionID: string
+    role: "user"
+    agent: string
+    time: {
+      created: number
+    }
+  }
+  | {
+    id: string
+    sessionID: string
+    role: "assistant"
+    parentID: string
+    agent: string
+    finish?: "other" | "length" | "unknown" | "error" | "stop" | "content-filter" | "tool-calls"
+    time: {
+      created: number
+      completed?: number
+    }
+  }
+
+export type OpenwriteTextPart = {
+  id: string
+  sessionID: string
+  messageID: string
+  type: "text"
+  text: string
+  synthetic?: boolean
+}
+
+export type OpenwriteMessageWithParts = {
+  info: OpenwriteMessageInfo
+  parts: OpenwriteTextPart[]
+}
+
 type RequestJSONError = {
   error?: string
 }
@@ -104,4 +141,40 @@ export async function fetchFileContent(input: {
     },
   })
   return payload
+}
+
+export async function sendMessage(input: {
+  projectID: string
+  text: string
+  agent?: string
+}) {
+  await requestJSON<{ message: OpenwriteMessageWithParts }>("/api/openwrite/message", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-project-id": input.projectID,
+    },
+    body: JSON.stringify({
+      text: input.text,
+      ...(input.agent ? { agent: input.agent } : {}),
+    }),
+  })
+}
+
+export async function listMessages(input: {
+  projectID: string
+  limit?: number
+}) {
+  const params = new URLSearchParams()
+  if (typeof input.limit === "number") {
+    params.set("limit", String(input.limit))
+  }
+  const query = params.toString()
+  const path = query ? `/api/openwrite/messages?${query}` : "/api/openwrite/messages"
+  return requestJSON<{ sessionID: string; messages: OpenwriteMessageWithParts[] }>(path, {
+    method: "GET",
+    headers: {
+      "x-project-id": input.projectID,
+    },
+  })
 }

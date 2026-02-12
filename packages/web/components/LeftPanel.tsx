@@ -15,6 +15,7 @@ interface LeftPanelProps {
   projectTitle: string;
   projectLoading: boolean;
   projectError: string | null;
+  fsRefreshTick: number;
 }
 
 export function LeftPanel({
@@ -26,6 +27,7 @@ export function LeftPanel({
   projectTitle,
   projectLoading,
   projectError,
+  fsRefreshTick,
 }: LeftPanelProps) {
   const projectSubtitle = projectError
     ? "backend unavailable"
@@ -91,7 +93,12 @@ export function LeftPanel({
               <span>Files</span>
               <LayoutGrid size={14} className="cursor-pointer hover:text-stone-600"/>
             </div>
-            <WorkspaceTree projectID={projectID} onSelect={onFileSelect} selectedId={selectedFileId} />
+            <WorkspaceTree
+              projectID={projectID}
+              onSelect={onFileSelect}
+              selectedId={selectedFileId}
+              fsRefreshTick={fsRefreshTick}
+            />
           </>
         )}
         {collapsed && (

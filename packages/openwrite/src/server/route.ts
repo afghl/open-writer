@@ -7,6 +7,7 @@ import { ctx, runRequestContextAsync } from "@/context"
 import { agentRegistry } from "@/agent/registry"
 import { Project } from "@/project"
 import { Session } from "@/session"
+import { Message } from "@/session/message"
 import { SessionPrompt } from "@/session/prompt"
 import { listTree, readFile } from "@/fs/workspace"
 import { FsServiceError } from "@/fs/types"
@@ -22,6 +23,9 @@ const fsReadInput = z.object({
   path: z.string().min(1),
   offset: z.coerce.number().int().min(0).optional(),
   limit: z.coerce.number().int().min(1).optional(),
+})
+const messageListInput = z.object({
+  limit: z.coerce.number().int().min(1).max(500).optional(),
 })
 
 const PROJECT_ID_HEADER = "x-project-id"
@@ -242,6 +246,61 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: message }, 500)
     }
   })
+
+  app.get("/api/messages", async (c) => {
+    const parsed = messageListInput.safeParse(c.req.query())
+    if (!parsed.success) {
+      return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
+    }
+
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+
+    let project: Project.Info
+    try {
+      project = await Project.get(projectID)
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return c.json({ error: `Project ${projectID} not found` }, 404)
+      }
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+
+    const sessionID = project.curr_session_id
+    if (!sessionID) {
+      return c.json({ error: "Session ID is required" }, 500)
+    }
+
+    try {
+      const allMessages = await Session.messages({ sessionID })
+      const filteredMessages = filterRenderableMessages(allMessages)
+      const limit = parsed.data.limit
+      const messages = typeof limit === "number"
+        ? filteredMessages.slice(-limit)
+        : filteredMessages
+      return c.json({ sessionID, messages })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+  })
+}
+
+function filterRenderableMessages(messages: Message.WithParts[]) {
+  return messages
+    .map((message) => ({
+      ...message,
+      parts: message.parts.filter(
+        (part): part is Message.TextPart =>
+          part.type === "text"
+          && !(part.synthetic ?? false)
+          && part.text.trim().length > 0,
+      ),
+    }))
+    .filter((message) => message.parts.length > 0)
 }
 
 function isNotFoundError(error: unknown) {

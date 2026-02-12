@@ -89,10 +89,12 @@ export function WorkspaceTree({
   projectID,
   onSelect,
   selectedId,
+  fsRefreshTick,
 }: {
   projectID: string | null
   onSelect: (node: FileNode) => void
   selectedId?: string
+  fsRefreshTick: number
 }) {
   const [nodes, setNodes] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -130,7 +132,7 @@ export function WorkspaceTree({
     return () => {
       active = false;
     };
-  }, [projectID]);
+  }, [projectID, fsRefreshTick]);
 
   return (
     <div className="mt-1 pb-10">

@@ -82,10 +82,15 @@ export async function proxyFetch(input: {
   method: string
   headers?: HeadersInit
   body?: BodyInit | null
+  timeoutMs?: number | null
 }) {
-  const timeoutMs = proxyTimeoutMs()
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  const timeoutMs = input.timeoutMs === null
+    ? null
+    : (input.timeoutMs ?? proxyTimeoutMs())
+  const timeout = timeoutMs === null
+    ? null
+    : setTimeout(() => controller.abort(), timeoutMs)
   const headers = new Headers(input.headers)
   headers.set(PROXY_TOKEN_HEADER, openwriteProxyToken())
 
@@ -102,12 +107,34 @@ export async function proxyFetch(input: {
       (error instanceof DOMException && error.name === "AbortError")
       || (error instanceof Error && error.name === "AbortError")
     ) {
+      if (timeoutMs === null) {
+        throw error
+      }
       throw new ProxyTimeoutError(`Openwrite backend request timed out after ${timeoutMs}ms`)
     }
     throw error
   } finally {
-    clearTimeout(timeout)
+    if (timeout) {
+      clearTimeout(timeout)
+    }
   }
+}
+
+export function relayStreamResponse(upstream: Response) {
+  const contentType = upstream.headers.get("content-type") ?? "text/event-stream; charset=utf-8"
+  const cacheControl = upstream.headers.get("cache-control") ?? "no-cache, no-transform"
+  const connection = upstream.headers.get("connection")
+  const headers = new Headers({
+    "content-type": contentType,
+    "cache-control": cacheControl,
+  })
+  if (connection) {
+    headers.set("connection", connection)
+  }
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers,
+  })
 }
 
 export async function relayResponse(upstream: Response) {
