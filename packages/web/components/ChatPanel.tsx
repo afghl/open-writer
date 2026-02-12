@@ -37,14 +37,20 @@ type DisplayMessage = {
   text: string;
   createdAt: number;
   pending?: boolean;
+  weak?: boolean;
 };
 
+const TOOL_STEP_HINT = "Tool step completed.";
+
 function mapToDisplayMessage(message: OpenwriteMessageWithParts): DisplayMessage {
+  const syntheticOnly =
+    message.parts.length > 0 && message.parts.every((part) => part.synthetic === true);
   return {
     id: message.info.id,
     role: message.info.role,
     text: messageText(message),
     createdAt: message.info.time.created,
+    weak: syntheticOnly,
   };
 }
 
@@ -133,7 +139,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [optimisticUserMessage, setOptimisticUserMessage] = useState<DisplayMessage | null>(null);
-  const [streamingAssistantMessage, setStreamingAssistantMessage] = useState<DisplayMessage | null>(null);
+  const [streamingAssistantMessages, setStreamingAssistantMessages] = useState<DisplayMessage[]>([]);
 
   const messageListRef = useRef<OpenwriteMessageWithParts[]>([]);
   const sendingAbortRef = useRef<AbortController | null>(null);
@@ -162,7 +168,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
     sendingAbortRef.current = null;
     setSending(false);
     setOptimisticUserMessage(null);
-    setStreamingAssistantMessage(null);
+    setStreamingAssistantMessages([]);
   }, [projectID]);
 
   useEffect(() => {
@@ -211,8 +217,8 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
     if (optimisticUserMessage) {
       messageMap.set(optimisticUserMessage.id, optimisticUserMessage);
     }
-    if (streamingAssistantMessage) {
-      messageMap.set(streamingAssistantMessage.id, streamingAssistantMessage);
+    for (const message of streamingAssistantMessages) {
+      messageMap.set(message.id, message);
     }
 
     return Array.from(messageMap.values()).sort((a, b) => {
@@ -221,7 +227,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
       }
       return a.id > b.id ? 1 : -1;
     });
-  }, [messages, optimisticUserMessage, streamingAssistantMessage]);
+  }, [messages, optimisticUserMessage, streamingAssistantMessages]);
 
   const status = sending ? "busy" : "idle";
 
@@ -246,13 +252,15 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
       createdAt: now,
       pending: true,
     });
-    setStreamingAssistantMessage({
-      id: localAssistantID,
-      role: "assistant",
-      text: "",
-      createdAt: now,
-      pending: true,
-    });
+    setStreamingAssistantMessages([
+      {
+        id: localAssistantID,
+        role: "assistant",
+        text: "",
+        createdAt: now,
+        pending: true,
+      },
+    ]);
 
     const onStreamEvent = (event: MessageStreamEvent) => {
       if (event.type === "user_ack") {
@@ -273,48 +281,83 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
 
       if (event.type === "assistant_start") {
         setSessionID(event.sessionID);
-        setStreamingAssistantMessage((previous) => {
-          if (!previous) {
-            return {
+        setStreamingAssistantMessages((previous) => {
+          const next = previous.filter((message) => message.id !== localAssistantID);
+          const existingIndex = next.findIndex((message) => message.id === event.assistantMessageID);
+          if (existingIndex === -1) {
+            next.push({
               id: event.assistantMessageID,
               role: "assistant",
               text: "",
               createdAt: event.createdAt,
               pending: true,
-            };
+            });
+            return next;
           }
-          return {
-            ...previous,
-            id: event.assistantMessageID,
-            text: previous.id === event.assistantMessageID ? previous.text : "",
+          const existing = next[existingIndex];
+          next[existingIndex] = {
+            ...existing,
             createdAt: event.createdAt,
             pending: true,
           };
+          return next;
         });
         return;
       }
 
       if (event.type === "text_delta") {
         setSessionID(event.sessionID);
-        setStreamingAssistantMessage((previous) => {
-          if (!previous) {
-            return {
+        setStreamingAssistantMessages((previous) => {
+          const next = previous.filter((message) => message.id !== localAssistantID);
+          const existingIndex = next.findIndex((message) => message.id === event.assistantMessageID);
+          if (existingIndex === -1) {
+            next.push({
               id: event.assistantMessageID,
               role: "assistant",
               text: event.delta,
               createdAt: Date.now(),
               pending: true,
-            };
+            });
+            return next;
           }
-          const shouldAppend =
-            previous.id === localAssistantID || previous.id === event.assistantMessageID;
-          const nextText = shouldAppend ? previous.text + event.delta : event.delta;
-          return {
-            ...previous,
-            id: event.assistantMessageID,
-            text: nextText,
+          const existing = next[existingIndex];
+          next[existingIndex] = {
+            ...existing,
+            text: existing.text + event.delta,
             pending: true,
+            weak: false,
           };
+          return next;
+        });
+        return;
+      }
+
+      if (event.type === "assistant_finish") {
+        setSessionID(event.sessionID);
+        setStreamingAssistantMessages((previous) => {
+          const next = previous.filter((message) => message.id !== localAssistantID);
+          const existingIndex = next.findIndex((message) => message.id === event.assistantMessageID);
+          if (existingIndex === -1) {
+            next.push({
+              id: event.assistantMessageID,
+              role: "assistant",
+              text: TOOL_STEP_HINT,
+              createdAt: event.completedAt,
+              pending: false,
+              weak: true,
+            });
+            return next;
+          }
+          const existing = next[existingIndex];
+          const hasText = existing.text.trim().length > 0;
+          next[existingIndex] = {
+            ...existing,
+            text: hasText ? existing.text : TOOL_STEP_HINT,
+            createdAt: existing.createdAt || event.completedAt,
+            pending: false,
+            weak: hasText ? existing.weak : true,
+          };
+          return next;
         });
         return;
       }
@@ -338,7 +381,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
       });
       await refreshMessages(lastMessageID ? { lastMessageID } : undefined);
       setOptimisticUserMessage(null);
-      setStreamingAssistantMessage(null);
+      setStreamingAssistantMessages([]);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
@@ -348,7 +391,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
         // Keep original error.
       }
       setOptimisticUserMessage(null);
-      setStreamingAssistantMessage(null);
+      setStreamingAssistantMessages([]);
     } finally {
       if (sendingAbortRef.current === controller) {
         sendingAbortRef.current = null;
@@ -381,6 +424,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
         )}
         {displayMessages.map((msg) => {
           const isUser = msg.role === "user";
+          const isWeakAssistantMessage = !isUser && msg.weak === true;
           return (
             <div
               key={msg.id}
@@ -407,12 +451,16 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
                     "leading-7 text-base md:text-medium",
                     isUser
                       ? "px-5 py-3 rounded-2xl bg-[#FAFAF9] border border-stone-200 text-stone-800 rounded-tr-sm shadow-sm"
-                      : "px-0 py-0 text-stone-800",
+                      : isWeakAssistantMessage
+                        ? "px-0 py-0 text-stone-400 text-sm leading-6"
+                        : "px-0 py-0 text-stone-800",
                   )}>
                     {isUser ? (
                       msg.text
                     ) : msg.text.length === 0 ? (
                       <span className="text-stone-400">Thinking...</span>
+                    ) : isWeakAssistantMessage ? (
+                      <span>{msg.text}</span>
                     ) : (
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                         {msg.text}

@@ -88,6 +88,14 @@ export type MessageStreamTextDeltaEvent = {
   delta: string
 }
 
+export type MessageStreamAssistantFinishEvent = {
+  type: "assistant_finish"
+  sessionID: string
+  assistantMessageID: string
+  completedAt: number
+  finishReason: string
+}
+
 export type MessageStreamDoneEvent = {
   type: "done"
   sessionID: string
@@ -108,6 +116,7 @@ export type MessageStreamEvent =
   | MessageStreamUserAckEvent
   | MessageStreamAssistantStartEvent
   | MessageStreamTextDeltaEvent
+  | MessageStreamAssistantFinishEvent
   | MessageStreamDoneEvent
   | MessageStreamErrorEvent
 
@@ -333,6 +342,18 @@ export async function sendMessageStream(input: {
         sessionID: readString(payload, "sessionID", eventName),
         assistantMessageID: readString(payload, "assistantMessageID", eventName),
         delta: readString(payload, "delta", eventName),
+      })
+      return
+    }
+
+    if (eventName === "assistant_finish") {
+      const payload = toSSERecord(parsed, eventName)
+      emitEvent({
+        type: "assistant_finish",
+        sessionID: readString(payload, "sessionID", eventName),
+        assistantMessageID: readString(payload, "assistantMessageID", eventName),
+        completedAt: readNumber(payload, "completedAt", eventName),
+        finishReason: readString(payload, "finishReason", eventName),
       })
       return
     }
