@@ -1,4 +1,4 @@
-import { proxyErrorResponse, relayResponse, upstreamURL } from "@/lib/openwrite-server"
+import { proxyErrorResponse, proxyFetch, relayResponse } from "@/lib/openwrite-server"
 
 const PROJECT_ID_HEADER = "x-project-id"
 
@@ -10,12 +10,13 @@ export async function GET(request: Request) {
 
   try {
     const query = new URL(request.url).searchParams.toString()
-    const upstream = await fetch(upstreamURL("/api/fs/read", query), {
+    const upstream = await proxyFetch({
+      pathname: "/api/fs/read",
+      query,
       method: "GET",
       headers: {
         [PROJECT_ID_HEADER]: projectID,
       },
-      cache: "no-store",
     })
     return relayResponse(upstream)
   } catch (error) {

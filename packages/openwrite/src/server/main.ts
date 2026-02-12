@@ -1,15 +1,18 @@
 import { setupRoutes, serverConfig } from "./route"
+import { resolveLogLevelEnv, validateServerEnv } from "./env"
 import { Log } from "@/util/log"
 import { Hono } from "hono"
 
 async function main() {
     const isDev = process.env.NODE_ENV !== "production"
-    const levelResult = Log.Level.safeParse(process.env.LOG_LEVEL)
+    const levelResult = Log.Level.safeParse(resolveLogLevelEnv())
     await Log.init({
         print: isDev,
         dev: isDev,
         level: levelResult.success ? levelResult.data : undefined,
     })
+
+    validateServerEnv()
 
     const app = new Hono()
     setupRoutes(app)

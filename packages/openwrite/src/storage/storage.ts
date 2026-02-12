@@ -1,7 +1,7 @@
 import fs from "node:fs/promises"
 import path from "node:path"
 
-const BASE_DIR = process.env.OPENWRITE_DATA_DIR ?? path.join(process.cwd(), ".openwrite")
+const BASE_DIR = process.env.OW_DATA_DIR ?? path.join(process.cwd(), ".openwrite")
 
 function toFilePath(segments: string[]) {
   return path.join(BASE_DIR, ...segments) + ".json"

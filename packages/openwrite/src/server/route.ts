@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono"
 import { streamSSE } from "hono/streaming"
 import { z } from "zod"
+import { resolveProxyToken } from "./env"
 import { subscribeAll } from "@/bus"
 import { ctx, runRequestContextAsync } from "@/context"
 import { agentRegistry } from "@/agent/registry"
@@ -24,11 +25,27 @@ const fsReadInput = z.object({
 })
 
 const PROJECT_ID_HEADER = "x-project-id"
+const PROXY_TOKEN_HEADER = "x-ow-proxy-token"
 
 export function setupRoutes(app: Hono) {
+  app.get("/healthz", (c) => c.json({ status: "ok" }))
+
+  app.use("*", async (c, next) => {
+    if (c.req.path === "/healthz") {
+      return next()
+    }
+    const expectedToken = resolveProxyToken()
+    const incomingToken = c.req.header(PROXY_TOKEN_HEADER)?.trim() ?? ""
+    if (!incomingToken || incomingToken !== expectedToken) {
+      return c.json({ error: "Unauthorized proxy request" }, 401)
+    }
+    return next()
+  })
+
   app.use("*", async (c, next) => {
     if (
-      (c.req.method === "POST" && c.req.path === "/api/project")
+      c.req.path === "/healthz"
+      || (c.req.method === "POST" && c.req.path === "/api/project")
       || (c.req.method === "GET" && c.req.path === "/api/projects")
     ) {
       return next()

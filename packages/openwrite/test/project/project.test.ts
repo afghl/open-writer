@@ -9,8 +9,8 @@ let dataRoot = ""
 beforeAll(async () => {
   namespaceRoot = await mkdtemp(path.join(os.tmpdir(), "openwrite-project-"))
   dataRoot = path.join(namespaceRoot, "data")
-  process.env.OPENWRITE_NAMESPACE = namespaceRoot
-  process.env.OPENWRITE_DATA_DIR = dataRoot
+  process.env.OW_NAMESPACE = namespaceRoot
+  process.env.OW_DATA_DIR = dataRoot
 })
 
 afterAll(async () => {

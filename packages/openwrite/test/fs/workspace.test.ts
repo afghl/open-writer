@@ -8,7 +8,7 @@ let namespaceRoot = ""
 
 beforeAll(async () => {
   namespaceRoot = await mkdtemp(path.join(os.tmpdir(), "openwrite-fs-"))
-  process.env.OPENWRITE_NAMESPACE = namespaceRoot
+  process.env.OW_NAMESPACE = namespaceRoot
 })
 
 afterAll(async () => {
