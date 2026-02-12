@@ -131,7 +131,7 @@ export function ToolMessageBox({ message }: { message: DisplayMessage }) {
     <div className="flex w-full max-w-3xl mx-auto justify-start">
       <div className="flex gap-4 w-full flex-row">
         <div className="flex flex-col gap-1 min-w-0 flex-1">
-          <div className="self-start block w-fit max-w-full py-0 text-[13px] leading-5 text-stone-400">
+          <div className="self-start block w-fit max-w-full py-0 text-[14px] leading-5 text-stone-400">
             <span>{message.text}</span>
           </div>
         </div>
