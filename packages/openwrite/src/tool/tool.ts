@@ -13,6 +13,7 @@ export namespace Tool {
     sessionID: string
     messageID: string
     agent: string
+    runID: string
     projectID: string
     abort: AbortSignal
     callID?: string

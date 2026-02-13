@@ -10,7 +10,6 @@ import { SessionProcessor } from "@/session/processor"
 import { LLM } from "@/session/llm"
 import { agentRegistry } from "@/agent/registry"
 import { Log } from "@/util/log"
-import { ctx as requestContext } from "@/context"
 
 export namespace SessionPrompt {
   const MAX_STEPS = 8
@@ -59,14 +58,18 @@ export namespace SessionPrompt {
   export async function prompt(input: PromptInput) {
     const agent = agentRegistry.resolve(input.agent)
     const agentInfo = agent.Info()
+    const session = await Session.get(input.sessionID)
+    const project = await Project.get(session.projectID)
+    const runID = project.curr_run_id || project.root_run_id
     const message = await createUserMessage({
       ...input,
       agent: agentInfo.name,
+      runID,
     })
-    return loop(message.info.sessionID)
+    return loop(message.info.sessionID, message.info.run_id)
   }
 
-  export async function loop(sessionID: string) {
+  export async function loop(sessionID: string, runID?: string) {
     const abort = start(sessionID)
     if (!abort) {
       return new Promise<Message.WithParts>((resolve, reject) => {
@@ -77,7 +80,11 @@ export namespace SessionPrompt {
     let lastResult: Message.WithParts | undefined
     let error: unknown
     let step = 0
-    const projectID = requestContext()?.project_id ?? ""
+    const session = await Session.get(sessionID)
+    const projectID = session.projectID
+    const project = await Project.get(projectID)
+    const rootRunID = project.root_run_id
+    const activeRunID = runID?.trim() || project.curr_run_id || rootRunID
 
     try {
       while (true) {
@@ -85,7 +92,11 @@ export namespace SessionPrompt {
           throw new DOMException("Aborted", "AbortError")
         }
 
-        const messages = await Session.messages({ sessionID })
+        const messages = await Session.messagesByRun({
+          sessionID,
+          runID: activeRunID,
+          defaultRunID: rootRunID,
+        })
         const lastUser = [...messages].reverse().find((msg) => msg.info.role === "user")
         if (!lastUser || lastUser.info.role !== "user") {
           throw new Error("No user message found in session.")
@@ -127,6 +138,7 @@ export namespace SessionPrompt {
           sessionID,
           parentID: lastUser.info.id,
           agent: agentInfo.name,
+          run_id: activeRunID,
           time: {
             created: Date.now(),
           },
@@ -192,12 +204,15 @@ export namespace SessionPrompt {
     return lastResult
   }
 
-  async function createUserMessage(input: PromptInput): Promise<Message.WithParts> {
+  async function createUserMessage(
+    input: PromptInput & { agent: string; runID: string },
+  ): Promise<Message.WithParts> {
     const info: Message.User = {
       id: Identifier.ascending("message"),
       role: "user",
       sessionID: input.sessionID,
       agent: input.agent,
+      run_id: input.runID,
       time: {
         created: Date.now(),
       },

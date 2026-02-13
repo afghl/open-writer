@@ -1,4 +1,5 @@
 export { agentRegistry, AgentRegistry } from "./registry"
 export { GeneralAgent } from "./general"
 export { PlanAgent } from "./plan"
+export { WriterAgent } from "./writer"
 export type { Agent, AgentInfo, AgentMode, PermissionRuleset } from "./types"

@@ -3,6 +3,7 @@ import type { Tool } from "./tool"
 import { ReadTool } from "./read"
 import { EditTool } from "./edit"
 import { BashTool } from "./bash"
+import { HandoffToWriterTool } from "./handoff-to-writer"
 
 export namespace ToolRegistry {
   const custom = new Map<string, Tool.Info>()
@@ -24,7 +25,7 @@ export namespace ToolRegistry {
   }
 
   export async function tools(agent?: Agent) {
-    const builtins = [ReadTool, EditTool, BashTool]
+    const builtins = [ReadTool, EditTool, BashTool, HandoffToWriterTool]
     const filtered = filterTools([...builtins, ...custom.values()], agent)
     const result = await Promise.all(
       filtered.map(async (t) => ({

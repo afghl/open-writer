@@ -118,6 +118,7 @@
   1) 确保 spec/spec.md 已更新到最新且与锁定版本一致（如 lock.json 提供版本信息则需匹配）
   2) 生成/更新 spec/handoff.json（见第 6 节 schema）
   3) 在对话中用一句话告知：“交接包已生成，写作阶段可启动。”
+  4) 当用户明确要求开始写作时，优先调用 handoff_to_writer 工具创建 handoff 任务，而不是直接切换 agent。
 
 
 # 5) 文件格式（严格）

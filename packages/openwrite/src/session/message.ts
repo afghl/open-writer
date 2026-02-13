@@ -121,6 +121,7 @@ export namespace Message {
       created: z.number(),
     }),
     agent: z.string(),
+    run_id: z.string(),
   }).meta({ ref: "UserMessage" })
   export type User = z.infer<typeof User>
 
@@ -128,6 +129,7 @@ export namespace Message {
     role: z.literal("assistant"),
     parentID: z.string(),
     agent: z.string(),
+    run_id: z.string(),
     time: z.object({
       created: z.number(),
       completed: z.number().optional(),

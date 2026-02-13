@@ -57,6 +57,7 @@ export namespace LLM {
             sessionID: input.sessionID,
             messageID: input.messageID,
             agent: agentInfo?.name,
+            runID: input.user.run_id,
             projectID: input.projectID,
             abort: input.abort,
             callID: options.toolCallId,

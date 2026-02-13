@@ -4,11 +4,13 @@ import { z } from "zod"
 import { resolveProxyToken } from "./env"
 import { subscribe } from "@/bus"
 import { ctx, runRequestContextAsync } from "@/context"
+import { Identifier } from "@/id/id"
 import { agentRegistry } from "@/agent/registry"
 import { Project } from "@/project"
 import { Session } from "@/session"
 import { Message } from "@/session/message"
 import { SessionPrompt } from "@/session/prompt"
+import { TaskRunner, TaskService } from "@/task"
 import { listTree, readFile } from "@/fs/workspace"
 import { FsServiceError } from "@/fs/types"
 import {
@@ -36,6 +38,13 @@ const fsReadInput = z.object({
 const messageListInput = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional(),
   last_message_id: z.string().min(1).optional(),
+})
+const taskCreateInput = z.object({
+  type: z.literal("handoff"),
+  input: z.object({
+    target_agent_name: z.string().min(1),
+  }),
+  idempotency_key: z.string().min(1).optional(),
 })
 
 const PROJECT_ID_HEADER = "x-project-id"
@@ -167,9 +176,17 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Session ID is required" }, 500)
     }
 
+    let chatLocked = false
+
     try {
+      await acquireSessionForChat(sessionID)
+      chatLocked = true
       SessionPrompt.assertNotBusy(sessionID)
     } catch (error) {
+      if (chatLocked) {
+        await releaseSessionFromChat(sessionID)
+        chatLocked = false
+      }
       const message = error instanceof Error ? error.message : "Session is busy"
       return c.json({ error: message }, 409)
     }
@@ -286,8 +303,16 @@ export function setupRoutes(app: Hono) {
         unsubscribeCreated()
         unsubscribeDelta()
         unsubscribeFinished()
+        if (chatLocked) {
+          await releaseSessionFromChat(sessionID)
+          chatLocked = false
+        }
       }
     }, async (err) => {
+      if (chatLocked) {
+        await releaseSessionFromChat(sessionID)
+        chatLocked = false
+      }
       console.error(err)
     })
   })
@@ -380,6 +405,107 @@ export function setupRoutes(app: Hono) {
     }
   })
 
+  app.post("/api/task", async (c) => {
+    let body
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: "Invalid JSON body" }, 400)
+    }
+
+    const parsed = taskCreateInput.safeParse(body)
+    if (!parsed.success) {
+      return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
+    }
+
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+
+    let project: Project.Info
+    try {
+      project = await Project.get(projectID)
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return c.json({ error: `Project ${projectID} not found` }, 404)
+      }
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+
+    if (!project.curr_session_id) {
+      return c.json({ error: "Session ID is required" }, 422)
+    }
+
+    const fromRunID = project.curr_run_id || project.root_run_id
+    const toRunID = Identifier.ascending("run")
+    const idempotencyKey = parsed.data.idempotency_key?.trim()
+      || TaskService.fallbackIdempotencyKey({
+        projectID,
+        sessionID: project.curr_session_id,
+        type: "handoff",
+        payload: {
+          from_run_id: fromRunID,
+          to_run_id: "__next_run__",
+          target_agent_name: parsed.data.input.target_agent_name,
+        },
+      })
+
+    try {
+      const result = await TaskService.createOrGetByIdempotency({
+        projectID,
+        sessionID: project.curr_session_id,
+        type: "handoff",
+        source: "api",
+        idempotencyKey,
+        createdByAgent: project.curr_agent_name,
+        createdByRunID: fromRunID,
+        input: {
+          from_run_id: fromRunID,
+          to_run_id: toRunID,
+          target_agent_name: parsed.data.input.target_agent_name,
+        },
+      })
+      TaskRunner.kick()
+      return c.json({
+        task: {
+          id: result.task.id,
+          status: result.task.status,
+        },
+      }, 202)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+  })
+
+  app.get("/api/task/:id", async (c) => {
+    const taskID = c.req.param("id")?.trim()
+    if (!taskID) {
+      return c.json({ error: "Task ID is required" }, 400)
+    }
+
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+
+    try {
+      const task = await TaskService.get(taskID)
+      if (task.project_id !== projectID) {
+        return c.json({ error: `Task ${taskID} not found` }, 404)
+      }
+      return c.json({ task })
+    } catch (error) {
+      if (isNotFoundError(error)) {
+        return c.json({ error: `Task ${taskID} not found` }, 404)
+      }
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
+  })
+
   app.post("/api/message", async (c) => {
     let body
     try {
@@ -418,14 +544,25 @@ export function setupRoutes(app: Hono) {
         throw new Error("Session ID is required")
       }
 
-      const message = await SessionPrompt.prompt({
-        sessionID,
-        text: parsed.data.text,
-        agent: resolvedAgent,
-      })
-      return c.json({ message })
+      await acquireSessionForChat(sessionID)
+      try {
+        const message = await SessionPrompt.prompt({
+          sessionID,
+          text: parsed.data.text,
+          agent: resolvedAgent,
+        })
+        return c.json({ message })
+      } finally {
+        await releaseSessionFromChat(sessionID)
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error"
+      if (
+        message.includes("busy")
+        || message.includes("handoff")
+      ) {
+        return c.json({ error: message }, 409)
+      }
       return c.json({ error: message }, 500)
     }
   })
@@ -458,7 +595,10 @@ export function setupRoutes(app: Hono) {
     }
 
     try {
-      const allMessages = await Session.messages({ sessionID })
+      const allMessages = await Session.messages({
+        sessionID,
+        defaultRunID: project.root_run_id,
+      })
       const filteredMessages = filterRenderableMessages(allMessages)
       const lastMessageID = parsed.data.last_message_id?.trim()
       const incrementMessages =
@@ -533,6 +673,30 @@ function filterRenderableMessages(messages: Message.WithParts[]) {
       })(),
     }))
     .filter((message) => message.parts.length > 0)
+}
+
+async function acquireSessionForChat(sessionID: string) {
+  const changed = await Session.transitionStatus({
+    sessionID,
+    from: ["idle"],
+    to: "chatting",
+  })
+  if (changed.changed) {
+    return
+  }
+  const session = await Session.get(sessionID)
+  if (session.status === "handoff_processing") {
+    throw new Error("Session is processing a handoff task")
+  }
+  throw new Error(`Session ${sessionID} is busy`)
+}
+
+async function releaseSessionFromChat(sessionID: string) {
+  await Session.transitionStatus({
+    sessionID,
+    from: ["chatting"],
+    to: "idle",
+  })
 }
 
 function isNotFoundError(error: unknown) {

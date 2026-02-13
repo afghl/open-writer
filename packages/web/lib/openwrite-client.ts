@@ -4,6 +4,8 @@ export type OpenwriteProject = {
   title: string
   curr_session_id: string
   curr_agent_name: string
+  root_run_id: string
+  curr_run_id: string
   phase: "planning" | "writing"
   time: {
     created: number
@@ -35,6 +37,7 @@ export type OpenwriteMessageInfo =
     sessionID: string
     role: "user"
     agent: string
+    run_id: string
     time: {
       created: number
     }
@@ -45,6 +48,7 @@ export type OpenwriteMessageInfo =
     role: "assistant"
     parentID: string
     agent: string
+    run_id: string
     finish?: "other" | "length" | "unknown" | "error" | "stop" | "content-filter" | "tool-calls"
     time: {
       created: number
@@ -120,6 +124,30 @@ export type MessageStreamEvent =
   | MessageStreamAssistantFinishEvent
   | MessageStreamDoneEvent
   | MessageStreamErrorEvent
+
+export type OpenwriteTaskStatus = "processing" | "success" | "fail"
+export type OpenwriteTask = {
+  id: string
+  project_id: string
+  session_id: string
+  type: "handoff"
+  status: OpenwriteTaskStatus
+  source: "api" | "agent_tool"
+  created_by_agent?: string
+  created_by_run_id?: string
+  idempotency_key: string
+  input: Record<string, unknown>
+  output?: Record<string, unknown>
+  error?: {
+    code: string
+    message: string
+  }
+  time: {
+    created: number
+    started?: number
+    finished?: number
+  }
+}
 
 type RequestJSONError = {
   error?: string
@@ -431,6 +459,37 @@ export async function listMessages(input: {
   const query = params.toString()
   const path = query ? `/api/openwrite/messages?${query}` : "/api/openwrite/messages"
   return requestJSON<{ sessionID: string; messages: OpenwriteMessageWithParts[] }>(path, {
+    method: "GET",
+    headers: {
+      "x-project-id": input.projectID,
+    },
+  })
+}
+
+export async function createTask(input: {
+  projectID: string
+  type: "handoff"
+  targetAgentName: string
+  idempotencyKey?: string
+}) {
+  return requestJSON<{ task: { id: string; status: OpenwriteTaskStatus } }>("/api/openwrite/task", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-project-id": input.projectID,
+    },
+    body: JSON.stringify({
+      type: input.type,
+      input: {
+        target_agent_name: input.targetAgentName,
+      },
+      ...(input.idempotencyKey ? { idempotency_key: input.idempotencyKey } : {}),
+    }),
+  })
+}
+
+export async function getTask(input: { projectID: string; taskID: string }) {
+  return requestJSON<{ task: OpenwriteTask }>(`/api/openwrite/task/${encodeURIComponent(input.taskID)}`, {
     method: "GET",
     headers: {
       "x-project-id": input.projectID,

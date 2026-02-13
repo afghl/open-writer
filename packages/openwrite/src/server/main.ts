@@ -1,6 +1,7 @@
 import { setupRoutes, serverConfig } from "./route"
 import { resolveLogLevelEnv, validateServerEnv } from "./env"
 import { Log } from "@/util/log"
+import { TaskRunner } from "@/task"
 import { Hono } from "hono"
 
 async function main() {
@@ -16,6 +17,7 @@ async function main() {
 
     const app = new Hono()
     setupRoutes(app)
+    TaskRunner.start()
     const log = Log.create({ service: "server" })
     const envPort = process.env.PORT ? Number(process.env.PORT) : undefined
     const port = Number.isFinite(envPort) ? envPort : serverConfig.port ?? 3000
@@ -27,6 +29,7 @@ async function main() {
 
     const shutdown = (signal: string) => {
         log.info("Shutting down server", { signal })
+        TaskRunner.stop()
         server.stop()
     }
 

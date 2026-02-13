@@ -2,6 +2,7 @@ import fs from "fs"
 import path from "path"
 import { GeneralAgent } from "./general"
 import { PlanAgent } from "./plan"
+import { WriterAgent } from "./writer"
 import type { Agent } from "./types"
 import { Log } from "@/util/log"
 
@@ -51,5 +52,6 @@ const agentRegistry = new AgentRegistry()
 
 agentRegistry.register(new GeneralAgent())
 agentRegistry.register(new PlanAgent())
+agentRegistry.register(new WriterAgent())
 
 export { agentRegistry }

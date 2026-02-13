@@ -32,6 +32,8 @@ export namespace Project {
     title: z.string(),
     curr_session_id: z.string(),
     curr_agent_name: z.string(),
+    root_run_id: z.string(),
+    curr_run_id: z.string(),
     phase: Phase,
     time: z.object({
       created: z.number(),
@@ -45,6 +47,23 @@ export namespace Project {
     return {
       ...info,
       project_slug: info.id,
+    }
+  }
+
+  function fallbackRootRunID(projectID: string) {
+    return `run_${projectID}`
+  }
+
+  function ensureRunIDs(info: Info): Info {
+    const root = info.root_run_id?.trim() ? info.root_run_id : fallbackRootRunID(info.id)
+    const curr = info.curr_run_id?.trim() ? info.curr_run_id : root
+    if (root === info.root_run_id && curr === info.curr_run_id) {
+      return info
+    }
+    return {
+      ...info,
+      root_run_id: root,
+      curr_run_id: curr,
     }
   }
 
@@ -64,15 +83,21 @@ export namespace Project {
     title?: string
     curr_session_id?: string
     curr_agent_name: string
+    curr_run_id?: string
+    root_run_id?: string
     phase?: Phase
   }) {
     const id = Identifier.ascending("project")
+    const rootRunID = input.root_run_id?.trim() || Identifier.ascending("run")
+    const currRunID = input.curr_run_id?.trim() || rootRunID
     const info: Info = {
       id,
       project_slug: id,
       title: input.title ?? defaultTitle(),
       curr_session_id: input.curr_session_id ?? "",
       curr_agent_name: input.curr_agent_name,
+      root_run_id: rootRunID,
+      curr_run_id: currRunID,
       phase: input.phase ?? "planning",
       time: {
         created: Date.now(),
@@ -86,13 +111,13 @@ export namespace Project {
 
   export async function get(projectID: string) {
     const info = await Storage.read<Info>(["project", projectID])
-    return ensureProjectSlug(info)
+    return ensureRunIDs(ensureProjectSlug(info))
   }
 
   export async function list() {
     const ids = await Storage.list(["project"])
     const all = await Promise.all(
-      ids.map(async (segments) => ensureProjectSlug(await Storage.read<Info>(segments))),
+      ids.map(async (segments) => ensureRunIDs(ensureProjectSlug(await Storage.read<Info>(segments)))),
     )
     all.sort((a, b) => b.time.updated - a.time.updated)
     return all
@@ -102,6 +127,12 @@ export namespace Project {
     return Storage.update<Info>(["project", projectID], (draft) => {
       if (!draft.project_slug?.trim()) {
         draft.project_slug = draft.id
+      }
+      if (!draft.root_run_id?.trim()) {
+        draft.root_run_id = fallbackRootRunID(draft.id)
+      }
+      if (!draft.curr_run_id?.trim()) {
+        draft.curr_run_id = draft.root_run_id
       }
       editor(draft)
       draft.time.updated = Date.now()
