@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { rootHolder } from "@/global"
-import { projectWorkspaceRoot, resolveWorkspacePath } from "@/path/workspace"
+import { projectWorkspaceRoot, resolveWorkspacePath } from "@/path"
 import { BM25Index } from "./bm25"
 import { chunkDocument } from "./chunker"
 import { rrfFuse } from "./fusion"

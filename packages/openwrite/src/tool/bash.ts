@@ -1,9 +1,9 @@
 import z from "zod"
-import { Tool } from "./tool"
+import { Tool, type ToolContext } from "./tool"
 import DESCRIPTION from "./bash.txt"
 import { rootHolder } from "@/global"
-import { resolveWorkspaceDir, rewriteCommandWorkspacePaths } from "@/path/workspace"
-import { Log } from "@/util/log"
+import { resolveWorkspaceDir, rewriteCommandWorkspacePaths } from "@/path"
+import { Log } from "@/util"
 const DEFAULT_TIMEOUT = 120_000
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
@@ -33,7 +33,7 @@ export const BashTool = Tool.define("bash", async () => ({
         "Clear, concise description of what this command does in 5-10 words. Examples:\nInput: ls\nOutput: Lists files in current directory\n\nInput: git status\nOutput: Shows working tree status\n\nInput: npm install\nOutput: Installs package dependencies\n\nInput: mkdir foo\nOutput: Creates directory 'foo'",
       ),
   }),
-  async execute(params, ctx: Tool.Context) {
+  async execute(params, ctx: ToolContext) {
     const resolvedCommand = rewriteCommandWorkspacePaths(params.command, ctx.projectID)
     const { resolvedPath: workdir, logicalNamespacePath } = resolveWorkspaceDir(params.workdir, ctx.projectID)
     await ctx.ask({

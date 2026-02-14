@@ -2,12 +2,16 @@ import { createOpenAI } from "@ai-sdk/openai"
 import { generateObject } from "ai"
 import { z } from "zod"
 import type { SummaryRecord } from "./types"
+import { Log } from "@/util"
 
-const SummarySchema = z.object({
-  title: z.string().min(1),
-  tldr: z.string().min(1),
-  keyPoints: z.array(z.string().min(1)).min(1).max(6),
-  evidencePoints: z.array(z.string().min(1)).min(1).max(6),
+
+const log = Log.create({ service: "library.summary" })
+
+const RawSummarySchema = z.object({
+  title: z.string().optional(),
+  tldr: z.string().optional(),
+  keyPoints: z.array(z.string()).optional(),
+  evidencePoints: z.array(z.string()).optional(),
 })
 
 function trimLine(input: string) {
@@ -53,6 +57,27 @@ function fallbackSummary(text: string): SummaryRecord {
   }
 }
 
+function normalizeSummary(raw: z.infer<typeof RawSummarySchema>, sourceText: string): SummaryRecord {
+  const fallback = fallbackSummary(sourceText)
+  const title = trimLine(raw.title ?? "")
+  const tldr = trimLine(raw.tldr ?? "")
+  const keyPoints = (raw.keyPoints ?? [])
+    .map((line) => trimLine(line))
+    .filter((line) => line.length > 0)
+    .slice(0, 6)
+  const evidencePoints = (raw.evidencePoints ?? [])
+    .map((line) => trimLine(line))
+    .filter((line) => line.length > 0)
+    .slice(0, 6)
+
+  return {
+    title: title || fallback.title,
+    tldr: tldr || fallback.tldr,
+    keyPoints: keyPoints.length > 0 ? keyPoints : fallback.keyPoints,
+    evidencePoints: evidencePoints.length > 0 ? evidencePoints : fallback.evidencePoints,
+  }
+}
+
 export async function buildSummary(input: {
   text: string
   sourceLabel: string
@@ -61,7 +86,6 @@ export async function buildSummary(input: {
   if (!apiKey) {
     return fallbackSummary(input.text)
   }
-
   const provider = createOpenAI({
     apiKey,
     baseURL: process.env.OPENAI_BASE_URL,
@@ -84,16 +108,28 @@ export async function buildSummary(input: {
   try {
     const result = await Promise.race([
       generateObject({
-        model: provider("gpt-4o-mini"),
-        schema: SummarySchema,
+        model: provider("gpt-5.1"),
+        schema: RawSummarySchema,
         prompt,
       }),
       new Promise<never>((_, reject) => {
         setTimeout(() => reject(new Error("Summary generation timed out")), 15_000)
       }),
     ])
-    return result.object
-  } catch {
+    const summary = normalizeSummary(result.object, input.text)
+    log.info("Summary generation completed", {
+      sourceLabel: input.sourceLabel,
+      text: input.text.slice(0, 12000),
+      summary,
+    })
+    return summary
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    log.error("Summary generation failed", {
+      sourceLabel: input.sourceLabel,
+      text: input.text.slice(0, 12000),
+      error: errorMessage,
+    })
     return fallbackSummary(input.text)
   }
 }

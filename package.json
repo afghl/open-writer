@@ -32,9 +32,10 @@
     "typecheck": "bun run typecheck:openwrite && bun run typecheck:web",
     "typecheck:openwrite": "bun run --cwd packages/openwrite typecheck",
     "typecheck:web": "bun run --cwd packages/web typecheck",
+    "lint:openwrite": "bun run --cwd packages/openwrite lint",
     "lint:web": "bun run --cwd packages/web lint",
     "build:web:ci": "OW_API_BASE=http://127.0.0.1:3000 OW_PROXY_TOKEN=ci-openwrite-proxy-token bun run --cwd packages/web build",
-    "ci:check": "bun run test:openwrite && bun run typecheck:openwrite && bun run typecheck:web && bun run lint:web && bun run build:web:ci"
+    "ci:check": "bun run test:openwrite && bun run typecheck:openwrite && bun run typecheck:web && bun run lint:openwrite && bun run lint:web && bun run build:web:ci"
   },
   "dependencies": {
     "@ai-sdk/openai": "catalog:",

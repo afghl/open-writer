@@ -4,15 +4,15 @@ import { z } from "zod"
 import { resolveProxyToken } from "./env"
 import { subscribe } from "@/bus"
 import { ctx, runRequestContextAsync } from "@/context"
-import { Identifier } from "@/id/id"
-import { agentRegistry } from "@/agent/registry"
+import { Identifier } from "@/id"
+import { agentRegistry } from "@/agent"
 import { Project } from "@/project"
-import { Session } from "@/session"
-import { Message } from "@/session/message"
-import { SessionPrompt } from "@/session/prompt"
+import { Session, Message, SessionPrompt } from "@/session"
+import type { MessagePart, MessageTextPart, MessageToolPart, MessageWithParts } from "@/session"
+import type { ProjectInfo } from "@/project"
 import { TaskRunner, TaskService } from "@/task"
-import { listTree, readFile } from "@/fs/workspace"
-import { FsServiceError } from "@/fs/types"
+import { listTree, readFile } from "@/fs"
+import { FsServiceError } from "@/fs"
 import { LibraryImportRunner, LibraryImportService, LibraryServiceError } from "@/library"
 import {
   fsCreated,
@@ -22,7 +22,7 @@ import {
   messageCreated,
   messageDelta,
   messageFinished,
-} from "@/bus/events"
+} from "@/bus"
 
 export const app = new Hono()
 const sessionPromptInput = z.object({ text: z.string().min(1), agent: z.string().min(1).optional() })
@@ -169,7 +169,7 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Project ID is required" }, 400)
     }
 
-    let project: Project.Info
+    let project: ProjectInfo
     try {
       project = await Project.get(projectID)
     } catch (error) {
@@ -533,7 +533,7 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Project ID is required" }, 400)
     }
 
-    let project: Project.Info
+    let project: ProjectInfo
     try {
       project = await Project.get(projectID)
     } catch (error) {
@@ -634,7 +634,7 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Project ID is required" }, 400)
     }
 
-    let project: Project.Info
+    let project: ProjectInfo
     try {
       project = await Project.get(projectID)
     } catch (error) {
@@ -673,13 +673,13 @@ export function setupRoutes(app: Hono) {
       }
 
       const reportMarkdown = result.parts
-        .filter((part): part is Message.TextPart => part.type === "text")
+        .filter((part): part is MessageTextPart => part.type === "text")
         .map((part) => part.text)
         .join("\n")
         .trim()
 
       const toolTrace = result.parts
-        .filter((part): part is Message.ToolPart => part.type === "tool")
+        .filter((part): part is MessageToolPart => part.type === "tool")
         .map((part) => ({
           tool: part.tool,
           status: part.state.status,
@@ -724,7 +724,7 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Project ID is required" }, 400)
     }
 
-    let project: Project.Info
+    let project: ProjectInfo
     try {
       project = await Project.get(projectID)
     } catch (error) {
@@ -778,7 +778,7 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Project ID is required" }, 400)
     }
 
-    let project: Project.Info
+    let project: ProjectInfo
     try {
       project = await Project.get(projectID)
     } catch (error) {
@@ -820,13 +820,13 @@ export function setupRoutes(app: Hono) {
   })
 }
 
-function filterRenderableMessages(messages: Message.WithParts[]) {
+function filterRenderableMessages(messages: MessageWithParts[]) {
   const TOOL_STEP_HINT = "Tool step completed."
   const TOOL_STEP_PREFIX = "Used tool:"
   const TOOL_STEPS_PREFIX = "Used tools:"
-  const getToolNames = (parts: Message.Part[]) => {
+  const getToolNames = (parts: MessagePart[]) => {
     const names = parts
-      .filter((part): part is Message.ToolPart => part.type === "tool")
+      .filter((part): part is MessageToolPart => part.type === "tool")
       .map((part) => part.tool.trim())
       .filter((name) => name.length > 0)
     return Array.from(new Set(names))
@@ -847,7 +847,7 @@ function filterRenderableMessages(messages: Message.WithParts[]) {
       ...message,
       parts: (() => {
         const textParts = message.parts.filter(
-          (part): part is Message.TextPart =>
+          (part): part is MessageTextPart =>
             part.type === "text"
             && !(part.synthetic ?? false)
             && part.text.trim().length > 0,

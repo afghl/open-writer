@@ -1,11 +1,11 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { createHash } from "node:crypto"
-import { Storage } from "@/storage/storage"
-import { Identifier } from "@/id/id"
-import { resolveWorkspacePath } from "@/path/workspace"
+import { Storage } from "@/storage"
+import { Identifier } from "@/id"
+import { resolveWorkspacePath } from "@/path"
 import { publishInProject } from "@/bus"
-import { fsCreated, fsUpdated } from "@/bus/events"
+import { fsCreated, fsUpdated } from "@/bus"
 import { chunkText, embedChunks } from "./etl"
 import { parseFileBuffer, parseYouTubeTranscript, makeShortHash } from "./parser"
 import { PineconeService } from "./pinecone"
@@ -269,8 +269,7 @@ function sourceLabel(input: {
   return input.fileName?.trim() || "Uploaded file"
 }
 
-export namespace LibraryImportService {
-  export async function createImport(input: {
+export async function createImport(input: {
     projectID: string
     replaceDocID?: string
     file?: {
@@ -374,27 +373,27 @@ export namespace LibraryImportService {
     return created
   }
 
-  export async function getImport(projectID: string, importID: string) {
-    return readImport(projectID, importID)
-  }
+export async function getImport(projectID: string, importID: string) {
+  return readImport(projectID, importID)
+}
 
-  export async function listDocs(projectID: string) {
-    const segments = await Storage.list(["library_doc", projectID])
-    const docs = await Promise.all(
-      segments.map(async (item) => LibraryDocInfo.parse(await Storage.read<LibraryDocInfo>(item))),
-    )
-    docs.sort((a, b) => b.updated_at - a.updated_at)
-    return docs.filter((doc) => doc.status === "ready")
-  }
+export async function listDocs(projectID: string) {
+  const segments = await Storage.list(["library_doc", projectID])
+  const docs = await Promise.all(
+    segments.map(async (item) => LibraryDocInfo.parse(await Storage.read<LibraryDocInfo>(item))),
+  )
+  docs.sort((a, b) => b.updated_at - a.updated_at)
+  return docs.filter((doc) => doc.status === "ready")
+}
 
-  export async function getDoc(projectID: string, docID: string) {
-    return readDoc(projectID, docID)
-  }
+export async function getDoc(projectID: string, docID: string) {
+  return readDoc(projectID, docID)
+}
 
-  export async function listPendingImports() {
-    const all: LibraryImportInfoType[] = []
-    const root = path.join(dataDir(), "library_import")
-    const projectDirs = await fs.readdir(root, { withFileTypes: true }).catch(() => [])
+export async function listPendingImports() {
+  const all: LibraryImportInfoType[] = []
+  const root = path.join(dataDir(), "library_import")
+  const projectDirs = await fs.readdir(root, { withFileTypes: true }).catch(() => [])
 
     for (const projectEntry of projectDirs) {
       if (!projectEntry.isDirectory()) continue
@@ -408,9 +407,9 @@ export namespace LibraryImportService {
       }
     }
 
-    all.sort((a, b) => a.time.created - b.time.created)
-    return all
-  }
+  all.sort((a, b) => a.time.created - b.time.created)
+  return all
+}
 
   async function markStage(projectID: string, importID: string, stage: LibraryImportInfoType["stage"]) {
     return updateImport(projectID, importID, (draft) => {
@@ -498,7 +497,7 @@ export namespace LibraryImportService {
     return doc
   }
 
-  export async function processImport(importTask: LibraryImportInfoType) {
+export async function processImport(importTask: LibraryImportInfoType) {
     const projectID = importTask.project_id
     const importID = importTask.id
 
@@ -661,18 +660,28 @@ export namespace LibraryImportService {
     }
   }
 
-  export function isPineconeEnabled() {
-    return pinecone.enabled
-  }
+export function isPineconeEnabled() {
+  return pinecone.enabled
+}
 
-  export function buildIdempotencyFingerprint(input: {
-    projectID: string
-    mode: "file" | "url"
-    source: string
-    replaceDocID?: string
-  }) {
-    return createHash("sha1")
-      .update([input.projectID, input.mode, input.source, input.replaceDocID ?? ""].join("|"))
-      .digest("hex")
-  }
+export function buildIdempotencyFingerprint(input: {
+  projectID: string
+  mode: "file" | "url"
+  source: string
+  replaceDocID?: string
+}) {
+  return createHash("sha1")
+    .update([input.projectID, input.mode, input.source, input.replaceDocID ?? ""].join("|"))
+    .digest("hex")
+}
+
+export const LibraryImportService = {
+  createImport,
+  getImport,
+  listDocs,
+  getDoc,
+  listPendingImports,
+  processImport,
+  isPineconeEnabled,
+  buildIdempotencyFingerprint,
 }

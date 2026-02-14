@@ -1,5 +1,5 @@
 import { expect, test, mock } from "bun:test"
-import type { Message as MessageType } from "../../src/session/message"
+import type { MessageWithParts } from "../../src/session/message"
 
 type ConvertCall = {
   messages: unknown
@@ -49,7 +49,7 @@ const createPartBase = (messageID: string, id: string) => ({
 test("filters user text parts and ignores empty/synthetic", () => {
   resetCalls()
   const userId = "user-1"
-  const input: MessageType.WithParts[] = [
+  const input: MessageWithParts[] = [
     {
       info: createUserInfo(userId),
       parts: [
@@ -98,7 +98,7 @@ test("keeps assistant parts and drops step-start-only messages", () => {
   resetCalls()
   const assistantId = "assistant-1"
   const stepOnlyId = "assistant-2"
-  const input: MessageType.WithParts[] = [
+  const input: MessageWithParts[] = [
     {
       info: createAssistantInfo(stepOnlyId),
       parts: [
@@ -165,7 +165,7 @@ test("keeps assistant parts and drops step-start-only messages", () => {
 test("maps tool parts and provides tool output conversion", () => {
   resetCalls()
   const assistantId = "assistant-3"
-  const input: MessageType.WithParts[] = [
+  const input: MessageWithParts[] = [
     {
       info: createAssistantInfo(assistantId),
       parts: [

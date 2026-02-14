@@ -195,6 +195,7 @@ CI 在 GitHub Actions 上执行 `bun run ci:check`。
 
 推荐拆分部署：
 1. `packages/web` 部署到 Vercel（Next.js）。
+   Vercel 项目里将 Root Directory 设置为 `packages/web`。
 2. `packages/openwrite` 部署到独立 Bun 服务。
 3. Web 通过服务器端 API route 代理后端，并携带共享 token。
 4. 若保留当前上传代理链路，请将单文件大小控制在 4MB 以内（Vercel 友好范围）。

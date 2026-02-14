@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { Task } from "@/task/types"
+import type { TaskInfo } from "@/task"
 
 export const HandoffTaskInput = z.object({
   from_run_id: z.string(),
@@ -16,7 +16,7 @@ export const HandoffTaskOutput = z.object({
 })
 export type HandoffTaskOutput = z.infer<typeof HandoffTaskOutput>
 
-export function parseHandoffTaskInput(task: Task.Info): HandoffTaskInput {
+export function parseHandoffTaskInput(task: TaskInfo): HandoffTaskInput {
   return HandoffTaskInput.parse(task.input)
 }
 

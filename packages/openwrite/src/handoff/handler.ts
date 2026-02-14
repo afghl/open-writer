@@ -1,16 +1,16 @@
 import { publishInProject } from "@/bus"
-import { messageCreated } from "@/bus/events"
-import { Identifier } from "@/id/id"
+import { messageCreated } from "@/bus"
+import { Identifier } from "@/id"
 import { Project } from "@/project"
 import { Session } from "@/session"
-import type { TaskHandler } from "@/task/registry"
-import type { Task } from "@/task/types"
+import type { TaskHandler } from "@/task"
+import type { TaskInfo } from "@/task"
 import { HandoffSummarizer } from "./summarizer"
 import { HandoffValidator } from "./validator"
 
 export const handoffTaskHandler: TaskHandler = {
   type: "handoff",
-  async execute(task: Task.Info) {
+  async execute(task: TaskInfo) {
     const project = await Project.get(task.project_id)
     const validation = await HandoffValidator.validate({ project, task })
     const handoffInput = validation.input

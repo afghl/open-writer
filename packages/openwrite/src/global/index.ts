@@ -24,13 +24,14 @@ export function getOpenwriteNamespace() {
   return openwriteNamespace
 }
 
-export namespace Global {
-  export const Path = {
-    home,
-    data,
-    log: process.env.OW_LOG_DIR || path.join(data, "log"),
-  }
+export const Path = {
+  home,
+  data,
+  log: process.env.OW_LOG_DIR || path.join(data, "log"),
+}
 
+export const Global = {
+  Path,
 }
 
 await fs.mkdir(Global.Path.log, { recursive: true })

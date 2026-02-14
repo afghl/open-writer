@@ -1,6 +1,6 @@
 import { BaseAgent, type PermissionRuleset } from "./types"
 import SYSTEM_PROMPT from "./writer.txt"
-import { SEARCH_TOOL_IDS } from "@/tool/search-shared"
+import { SEARCH_TOOL_IDS } from "@/tool"
 
 const defaultPermission: PermissionRuleset = {
   denyTools: Array.from(SEARCH_TOOL_IDS),

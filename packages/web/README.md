@@ -22,9 +22,10 @@ For local development without explicit env configuration:
 1. Push this code to a GitHub repository.
 2. Go to [Vercel](https://vercel.com) and click "Add New... > Project".
 3. Import your repository.
-4. Keep the default settings (Framework Preset: Next.js).
-5. Click **Deploy**.
-6. Configure the environment variables below.
+4. In **Root Directory**, select `packages/web`.
+5. Keep Framework Preset as **Next.js**.
+6. Configure the environment variables below **before first deploy**.
+7. Click **Deploy**.
 
 ### Required Vercel Environment Variables (Production)
 

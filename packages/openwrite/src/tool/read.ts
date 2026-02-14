@@ -1,9 +1,9 @@
 import z from "zod"
 import { promises as fs } from "node:fs"
 import path from "node:path"
-import { Tool } from "./tool"
+import { Tool, type ToolContext } from "./tool"
 import DESCRIPTION from "./read.txt"
-import { resolveWorkspacePath } from "@/path/workspace"
+import { resolveWorkspacePath } from "@/path"
 
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024
@@ -42,7 +42,7 @@ export const ReadTool = Tool.define("read", async () => ({
       .optional()
       .describe("The number of lines to read (defaults to 2000)"),
   }),
-  async execute(params, ctx: Tool.Context) {
+  async execute(params, ctx: ToolContext) {
     const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(params.filePath, ctx.projectID)
     await ctx.ask({
       permission: "read",

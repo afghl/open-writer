@@ -1,5 +1,5 @@
 import z from "zod"
-import { Identifier } from "@/id/id"
+import { Identifier } from "@/id"
 import { Project } from "@/project"
 import { TaskRunner, TaskService } from "@/task"
 import { Tool } from "./tool"

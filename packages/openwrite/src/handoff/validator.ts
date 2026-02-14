@@ -1,9 +1,9 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
-import { agentRegistry } from "@/agent/registry"
-import type { Project } from "@/project"
-import type { Task } from "@/task/types"
-import { projectWorkspaceRoot } from "@/path/workspace"
+import { agentRegistry } from "@/agent"
+import type { ProjectInfo } from "@/project"
+import type { TaskInfo } from "@/task"
+import { projectWorkspaceRoot } from "@/path"
 import { parseHandoffTaskInput, type HandoffTaskInput } from "./types"
 
 export type HandoffValidation = {
@@ -28,12 +28,11 @@ async function readJSON(filePath: string) {
   return parsed as Record<string, unknown>
 }
 
-export namespace HandoffValidator {
-  export async function validate(input: {
-    project: Project.Info
-    task: Task.Info
-  }): Promise<HandoffValidation> {
-    const handoffInput = parseHandoffTaskInput(input.task)
+export async function validate(input: {
+  project: ProjectInfo
+  task: TaskInfo
+}): Promise<HandoffValidation> {
+  const handoffInput = parseHandoffTaskInput(input.task)
 
     if (input.project.phase !== "planning") {
       throw new Error("Project must be in planning phase before handoff.")
@@ -59,10 +58,13 @@ export namespace HandoffValidator {
     }
     const handoff = await readJSON(handoffPath)
 
-    return {
-      lock,
-      handoff,
-      input: handoffInput,
-    }
+  return {
+    lock,
+    handoff,
+    input: handoffInput,
   }
+}
+
+export const HandoffValidator = {
+  validate,
 }

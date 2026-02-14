@@ -1,6 +1,6 @@
 import z from "zod"
 import { Tool } from "./tool"
-import { fetchChunks } from "@/search/cache"
+import { fetchChunks } from "@/search"
 
 const DESCRIPTION =
   "Fetch full chunk text and metadata by chunk IDs for evidence verification."

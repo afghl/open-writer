@@ -1,19 +1,22 @@
-import { Task } from "./types"
+import type { TaskInfo, TaskOutput, TaskType } from "./types"
 
 export type TaskHandler = {
-  type: Task.Type
-  execute(task: Task.Info): Promise<Task.Output>
+  type: TaskType
+  execute(task: TaskInfo): Promise<TaskOutput>
 }
 
-export namespace TaskRegistry {
-  const handlers = new Map<Task.Type, TaskHandler>()
+const handlers = new Map<TaskType, TaskHandler>()
 
-  export function register(handler: TaskHandler) {
-    handlers.set(handler.type, handler)
-  }
+export function register(handler: TaskHandler) {
+  handlers.set(handler.type, handler)
+}
 
-  export function get(type: Task.Type) {
-    return handlers.get(type)
-  }
+export function get(type: TaskType) {
+  return handlers.get(type)
+}
+
+export const TaskRegistry = {
+  register,
+  get,
 }
 

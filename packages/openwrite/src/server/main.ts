@@ -1,6 +1,6 @@
 import { setupRoutes, serverConfig } from "./route"
 import { resolveLogLevelEnv, validateServerEnv } from "./env"
-import { Log } from "@/util/log"
+import { Log } from "@/util"
 import { TaskRunner } from "@/task"
 import { LibraryImportRunner } from "@/library"
 import { Hono } from "hono"

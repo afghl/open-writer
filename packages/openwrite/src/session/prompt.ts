@@ -1,43 +1,43 @@
 import { z } from "zod"
 import { publish } from "@/bus"
-import { messageCreated, messageFinished } from "@/bus/events"
-import { Identifier } from "@/id/id"
+import { messageCreated, messageFinished } from "@/bus"
+import { Identifier } from "@/id"
 import { Project } from "@/project"
-import { Session } from "@/session"
-import { Message } from "@/session/message"
-import { ToolRegistry } from "@/tool/registry"
-import { SessionProcessor } from "@/session/processor"
-import { LLM } from "@/session/llm"
-import { agentRegistry } from "@/agent/registry"
-import { Log } from "@/util/log"
+import { Session } from "./core"
+import { Message } from "./message"
+import { ToolRegistry } from "@/tool"
+import { SessionProcessor } from "./processor"
+import { LLM } from "./llm"
+import { agentRegistry } from "@/agent"
+import { Log } from "@/util"
+import type { AssistantMessage, MessageTextPart, MessageWithParts, UserMessage } from "./message"
 
-export namespace SessionPrompt {
-  const MAX_STEPS = 8
+const MAX_STEPS = 8
 
-  const busyState = new Map<
-    string,
-    {
-      abort: AbortController
-      callbacks: Array<{
-        resolve(input: Message.WithParts): void
-        reject(reason?: unknown): void
-      }>
-    }
-  >()
-
-  export const PromptInput = z.object({
-    sessionID: z.string(),
-    text: z.string().min(1),
-    agent: z.string().optional(),
-    skipTitleGeneration: z.boolean().optional(),
-  })
-  export type PromptInput = z.infer<typeof PromptInput>
-
-  export function assertNotBusy(sessionID: string) {
-    if (busyState.has(sessionID)) {
-      throw new Error(`Session ${sessionID} is busy`)
-    }
+const busyState = new Map<
+  string,
+  {
+    abort: AbortController
+    callbacks: Array<{
+      resolve(input: MessageWithParts): void
+      reject(reason?: unknown): void
+    }>
   }
+>()
+
+export const PromptInput = z.object({
+  sessionID: z.string(),
+  text: z.string().min(1),
+  agent: z.string().optional(),
+  skipTitleGeneration: z.boolean().optional(),
+})
+export type PromptInput = z.infer<typeof PromptInput>
+
+export function assertNotBusy(sessionID: string) {
+  if (busyState.has(sessionID)) {
+    throw new Error(`Session ${sessionID} is busy`)
+  }
+}
 
   function start(sessionID: string) {
     if (busyState.has(sessionID)) return undefined
@@ -46,7 +46,7 @@ export namespace SessionPrompt {
     return controller.signal
   }
 
-  export function cancel(sessionID: string) {
+export function cancel(sessionID: string) {
     const entry = busyState.get(sessionID)
     if (!entry) return
     entry.abort.abort()
@@ -56,7 +56,7 @@ export namespace SessionPrompt {
     busyState.delete(sessionID)
   }
 
-  export async function prompt(input: PromptInput) {
+export async function prompt(input: PromptInput) {
     const agent = agentRegistry.resolve(input.agent)
     const agentInfo = agent.Info()
     const session = await Session.get(input.sessionID)
@@ -72,19 +72,19 @@ export namespace SessionPrompt {
     })
   }
 
-  export async function loop(
+export async function loop(
     sessionID: string,
     runID?: string,
     options?: { skipTitleGeneration?: boolean },
   ) {
     const abort = start(sessionID)
     if (!abort) {
-      return new Promise<Message.WithParts>((resolve, reject) => {
+      return new Promise<MessageWithParts>((resolve, reject) => {
         busyState.get(sessionID)?.callbacks.push({ resolve, reject })
       })
     }
 
-    let lastResult: Message.WithParts | undefined
+    let lastResult: MessageWithParts | undefined
     let error: unknown
     let step = 0
     const session = await Session.get(sessionID)
@@ -139,7 +139,7 @@ export namespace SessionPrompt {
         step += 1
 
         const tools = await ToolRegistry.tools(agent)
-        const assistant: Message.Assistant = {
+        const assistant: AssistantMessage = {
           id: Identifier.ascending("message"),
           role: "assistant",
           sessionID,
@@ -213,10 +213,10 @@ export namespace SessionPrompt {
     return lastResult
   }
 
-  async function createUserMessage(
+async function createUserMessage(
     input: PromptInput & { agent: string; runID: string },
-  ): Promise<Message.WithParts> {
-    const info: Message.User = {
+): Promise<MessageWithParts> {
+  const info: UserMessage = {
       id: Identifier.ascending("message"),
       role: "user",
       sessionID: input.sessionID,
@@ -227,7 +227,7 @@ export namespace SessionPrompt {
       },
     }
 
-    const part: Message.TextPart = {
+  const part: MessageTextPart = {
       id: Identifier.ascending("part"),
       sessionID: input.sessionID,
       messageID: info.id,
@@ -246,10 +246,10 @@ export namespace SessionPrompt {
     return { info, parts: [part] }
   }
 
-  async function ensureTitleIfNeeded(
+async function ensureTitleIfNeeded(
     sessionID: string,
-    history: Message.WithParts[],
-    lastResult?: Message.WithParts,
+  history: MessageWithParts[],
+  lastResult?: MessageWithParts,
   ) {
     if (!lastResult || lastResult.info.role !== "assistant" || !lastResult.info.time.completed) return
     const session = await Session.get(sessionID)
@@ -264,7 +264,7 @@ export namespace SessionPrompt {
     )
     if (firstRealUserIndex === -1) return
 
-    const firstUser = history[firstRealUserIndex].info as Message.User
+    const firstUser = history[firstRealUserIndex].info as UserMessage
     try {
       const agent = agentRegistry.resolve(firstUser.agent)
       const result = await LLM.stream({
@@ -297,7 +297,7 @@ export namespace SessionPrompt {
     }
   }
 
-  function isAssistantFinished(message: Message.WithParts) {
+function isAssistantFinished(message: MessageWithParts) {
     if (message.info.role !== "assistant") return false
     if (!message.info.time.completed) return false
     if (message.info.finish) {
@@ -306,11 +306,17 @@ export namespace SessionPrompt {
     return !messageHasPendingTool(message)
   }
 
-  function messageHasPendingTool(message: Message.WithParts) {
+function messageHasPendingTool(message: MessageWithParts) {
     return message.parts.some(
       (part) =>
         part.type === "tool" &&
         (part.state.status === "pending" || part.state.status === "running"),
     )
   }
+export const SessionPrompt = {
+  PromptInput,
+  assertNotBusy,
+  cancel,
+  prompt,
+  loop,
 }

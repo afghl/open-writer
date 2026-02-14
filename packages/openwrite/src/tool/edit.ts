@@ -2,11 +2,11 @@ import z from "zod"
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { createTwoFilesPatch, diffLines } from "diff"
-import { Tool } from "./tool"
+import { Tool, type ToolContext } from "./tool"
 import DESCRIPTION from "./edit.txt"
-import { resolveWorkspacePath } from "@/path/workspace"
+import { resolveWorkspacePath } from "@/path"
 import { publish } from "@/bus"
-import { fsUpdated } from "@/bus/events"
+import { fsUpdated } from "@/bus"
 
 const diffStats = (before: string, after: string) => {
   let additions = 0
@@ -26,7 +26,7 @@ export const EditTool = Tool.define("edit", async () => ({
     newString: z.string().describe("The text to replace it with (must be different from oldString)"),
     replaceAll: z.boolean().optional().describe("Replace all occurrences of oldString (default false)"),
   }),
-  async execute(params, ctx: Tool.Context) {
+  async execute(params, ctx: ToolContext) {
     const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(params.filePath, ctx.projectID)
     await ctx.ask({
       permission: "edit",

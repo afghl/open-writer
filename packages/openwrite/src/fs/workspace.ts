@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
-import { resolveWorkspacePath } from "@/path/workspace"
+import { resolveWorkspacePath } from "@/path"
 import type { FsNode, FsReadResult } from "./types"
 import { FsServiceError } from "./types"
 

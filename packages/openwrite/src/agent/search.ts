@@ -1,6 +1,6 @@
 import { BaseAgent } from "./types"
 import SYSTEM_PROMPT from "./search.txt"
-import { SEARCH_TOOL_IDS } from "@/tool/search-shared"
+import { SEARCH_TOOL_IDS } from "@/tool"
 
 export class SearchAgent extends BaseAgent {
   constructor() {

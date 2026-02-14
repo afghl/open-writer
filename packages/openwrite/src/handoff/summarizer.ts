@@ -1,5 +1,5 @@
-import type { Task } from "@/task/types"
-import type { Message } from "@/session/message"
+import type { TaskInfo } from "@/task"
+import type { MessageTextPart, MessageWithParts } from "@/session"
 import type { HandoffTaskInput } from "./types"
 
 function stringifyValue(value: unknown) {
@@ -34,26 +34,25 @@ function firstNonEmpty(input: Array<unknown>) {
   return ""
 }
 
-export namespace HandoffSummarizer {
-  export function toUserMessage(input: {
-    task: Task.Info
-    handoffInput: HandoffTaskInput
-    handoff: Record<string, unknown>
-    history: Message.WithParts[]
-  }) {
-    const objective = firstNonEmpty([
-      input.handoff.objective,
-      input.handoff.goal,
-      input.handoff.title,
-      input.handoff.summary,
-    ])
-    const constraints = toLines(
-      input.handoff.constraints ?? input.handoff.rules ?? input.handoff.must_follow,
-    )
-    const risks = toLines(
-      input.handoff.outstanding_risks ?? input.handoff.risks ?? input.handoff.questions,
-    )
-    const historySummary = summarizeHistory(input.history)
+export function toUserMessage(input: {
+  task: TaskInfo
+  handoffInput: HandoffTaskInput
+  handoff: Record<string, unknown>
+  history: MessageWithParts[]
+}) {
+  const objective = firstNonEmpty([
+    input.handoff.objective,
+    input.handoff.goal,
+    input.handoff.title,
+    input.handoff.summary,
+  ])
+  const constraints = toLines(
+    input.handoff.constraints ?? input.handoff.rules ?? input.handoff.must_follow,
+  )
+  const risks = toLines(
+    input.handoff.outstanding_risks ?? input.handoff.risks ?? input.handoff.questions,
+  )
+  const historySummary = summarizeHistory(input.history)
 
     const lines: string[] = []
     lines.push("# Handoff Meta")
@@ -98,17 +97,16 @@ export namespace HandoffSummarizer {
     lines.push("# Action Request")
     lines.push("- Start writing in this run based on this handoff package.")
 
-    return lines.join("\n")
-  }
+  return lines.join("\n")
 }
 
-function summarizeHistory(history: Message.WithParts[]) {
+function summarizeHistory(history: MessageWithParts[]) {
   const items: string[] = []
   const normalized = history
     .slice(-10)
     .map((message) => {
       const text = message.parts
-        .filter((part): part is Message.TextPart => part.type === "text")
+        .filter((part): part is MessageTextPart => part.type === "text")
         .map((part) => part.text.trim())
         .filter((line) => line.length > 0)
         .join("\n")
@@ -126,4 +124,8 @@ function summarizeHistory(history: Message.WithParts[]) {
     items.push(`${item.role}: ${clipped}`)
   }
   return items
+}
+
+export const HandoffSummarizer = {
+  toUserMessage,
 }

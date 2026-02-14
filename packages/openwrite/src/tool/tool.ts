@@ -1,69 +1,71 @@
 import z from "zod"
-import type { Message } from "@/session/message"
-import type { Permission } from "@/permission/permission"
+import type { MessageWithParts } from "@/session"
+import type { PermissionRequest } from "@/permission"
 
-export namespace Tool {
-  interface Metadata {
-    [key: string]: any
-  }
+export interface ToolMetadata {
+  [key: string]: any
+}
 
-  export interface InitContext { }
+export interface ToolInitContext {}
 
-  export type Context<M extends Metadata = Metadata> = {
-    sessionID: string
-    messageID: string
-    agent: string
-    runID: string
-    projectID: string
-    abort: AbortSignal
-    callID?: string
-    messages: Message.WithParts[]
-    metadata(input: { title?: string; metadata?: M }): void
-    ask(input: Permission.Request): Promise<void>
-  }
+export type ToolContext<M extends ToolMetadata = ToolMetadata> = {
+  sessionID: string
+  messageID: string
+  agent: string
+  runID: string
+  projectID: string
+  abort: AbortSignal
+  callID?: string
+  messages: MessageWithParts[]
+  metadata(input: { title?: string; metadata?: M }): void
+  ask(input: PermissionRequest): Promise<void>
+}
 
-  export interface Info<Parameters extends z.ZodType = z.ZodType, M extends Metadata = Metadata> {
-    id: string
-    init: (ctx?: InitContext) => Promise<{
-      description: string
-      parameters: Parameters
-      execute(
-        args: z.infer<Parameters>,
-        ctx: Context,
-      ): Promise<{
-        title: string
-        metadata: M
-        output: string
-      }>
-      formatValidationError?(error: z.ZodError): string
+export interface ToolInfo<Parameters extends z.ZodType = z.ZodType, M extends ToolMetadata = ToolMetadata> {
+  id: string
+  init: (ctx?: ToolInitContext) => Promise<{
+    description: string
+    parameters: Parameters
+    execute(
+      args: z.infer<Parameters>,
+      ctx: ToolContext,
+    ): Promise<{
+      title: string
+      metadata: M
+      output: string
     }>
-  }
+    formatValidationError?(error: z.ZodError): string
+  }>
+}
 
-  export function define<Parameters extends z.ZodType, Result extends Metadata>(
-    id: string,
-    init: Info<Parameters, Result>["init"] | Awaited<ReturnType<Info<Parameters, Result>["init"]>>,
-  ): Info<Parameters, Result> {
-    return {
-      id,
-      init: async (initCtx: Tool.InitContext) => {
-        const toolInfo = init instanceof Function ? await init(initCtx) : init
-        const execute = toolInfo.execute
-        toolInfo.execute = async (args, ctx) => {
-          try {
-            toolInfo.parameters.parse(args)
-          } catch (error) {
-            if (error instanceof z.ZodError && toolInfo.formatValidationError) {
-              throw new Error(toolInfo.formatValidationError(error), { cause: error })
-            }
-            throw new Error(
-              `The ${id} tool was called with invalid arguments: ${error}.\nPlease rewrite the input so it satisfies the expected schema.`,
-              { cause: error },
-            )
+export function defineTool<Parameters extends z.ZodType, Result extends ToolMetadata>(
+  id: string,
+  init: ToolInfo<Parameters, Result>["init"] | Awaited<ReturnType<ToolInfo<Parameters, Result>["init"]>>,
+): ToolInfo<Parameters, Result> {
+  return {
+    id,
+    init: async (initCtx: ToolInitContext) => {
+      const toolInfo = init instanceof Function ? await init(initCtx) : init
+      const execute = toolInfo.execute
+      toolInfo.execute = async (args, ctx) => {
+        try {
+          toolInfo.parameters.parse(args)
+        } catch (error) {
+          if (error instanceof z.ZodError && toolInfo.formatValidationError) {
+            throw new Error(toolInfo.formatValidationError(error), { cause: error })
           }
-          return execute(args, ctx)
+          throw new Error(
+            `The ${id} tool was called with invalid arguments: ${error}.\nPlease rewrite the input so it satisfies the expected schema.`,
+            { cause: error },
+          )
         }
-        return toolInfo
-      },
-    }
+        return execute(args, ctx)
+      }
+      return toolInfo
+    },
   }
+}
+
+export const Tool = {
+  define: defineTool,
 }

@@ -3,8 +3,7 @@ import { Hono } from "hono"
 import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { publish } from "@/bus"
-import { messageCreated, messageDelta, messageFinished } from "@/bus/events"
+import { publish, messageCreated, messageDelta, messageFinished } from "@/bus"
 
 type PromptInput = { sessionID: string }
 type PromptResult = {

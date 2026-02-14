@@ -1,30 +1,31 @@
-import { Identifier } from "@/id/id"
-import { Session } from "@/session"
-import { Message } from "@/session/message"
-import type { Tool } from "@/tool/tool"
-import { LLM } from "@/session/llm"
+import { Identifier } from "@/id"
+import { Session } from "./core"
+import { Message } from "./message"
+import type { ToolInfo } from "@/tool"
+import { LLM } from "./llm"
 import type { ModelMessage } from "ai"
-import { Log } from "@/util/log"
-import type { Agent } from "@/agent/types"
+import { Log } from "@/util"
+import type { Agent } from "@/agent"
 import { publish } from "@/bus"
-import { messageDelta } from "@/bus/events"
+import { messageDelta } from "@/bus"
+import type { AssistantMessage, MessageTextPart, MessageToolPart, MessageWithParts, UserMessage } from "./message"
 
 type CreateInput = {
-  assistantMessage: Message.Assistant
+  assistantMessage: AssistantMessage
   sessionID: string
   projectID: string
-  user: Message.User
-  history: Message.WithParts[]
-  tools: Array<Awaited<ReturnType<Tool.Info["init"]>> & { id: string }>
+  user: UserMessage
+  history: MessageWithParts[]
+  tools: Array<Awaited<ReturnType<ToolInfo["init"]>> & { id: string }>
   messages: ModelMessage[]
   abort: AbortSignal
   agentRef?: Agent
 }
 
 export const create = (input: CreateInput) => {
-  const toolcalls = new Map<string, Message.ToolPart>()
+  const toolcalls = new Map<string, MessageToolPart>()
 
-  let currentText: Message.TextPart | undefined
+  let currentText: MessageTextPart | undefined
 
   const result = {
     get message() {
@@ -93,7 +94,7 @@ export const create = (input: CreateInput) => {
           }
           case "tool-input-start": {
             if (!toolcalls.has(value.id)) {
-              const part: Message.ToolPart = {
+              const part: MessageToolPart = {
                 id: Identifier.ascending("part"),
                 sessionID: input.sessionID,
                 messageID: input.assistantMessage.id,
@@ -112,7 +113,7 @@ export const create = (input: CreateInput) => {
             break
           }
           case "tool-call": {
-            const part: Message.ToolPart = {
+            const part: MessageToolPart = {
               id: toolcalls.get(value.toolCallId)?.id ?? Identifier.ascending("part"),
               sessionID: input.sessionID,
               messageID: input.assistantMessage.id,
@@ -139,7 +140,7 @@ export const create = (input: CreateInput) => {
                 : typeof outputPayload.output === "string"
                   ? outputPayload.output
                   : JSON.stringify(outputPayload)
-            const completed: Message.ToolPart = {
+            const completed: MessageToolPart = {
               ...match,
               state: {
                 status: "completed",
@@ -163,7 +164,7 @@ export const create = (input: CreateInput) => {
               Log.Default.error("Tool call not found", { toolCallId: value.toolCallId })
               break
             }
-            const failed: Message.ToolPart = {
+            const failed: MessageToolPart = {
               ...match,
               state: {
                 status: "error",

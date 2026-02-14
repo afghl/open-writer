@@ -1,6 +1,6 @@
 import z from "zod"
 import { Tool } from "./tool"
-import { normalizeScope, searchCandidates } from "@/search/cache"
+import { normalizeScope, searchCandidates } from "@/search"
 
 const DESCRIPTION =
   "Search candidate chunks from inputs/library using BM25 + vector retrieval and return fused ranked candidates."

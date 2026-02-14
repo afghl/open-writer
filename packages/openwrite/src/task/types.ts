@@ -1,45 +1,53 @@
 import { z } from "zod"
 
-export namespace Task {
-  export const Type = z.enum(["handoff"])
-  export type Type = z.infer<typeof Type>
+export const TaskType = z.enum(["handoff"])
+export type TaskType = z.infer<typeof TaskType>
 
-  export const Status = z.enum(["processing", "success", "fail"])
-  export type Status = z.infer<typeof Status>
+export const TaskStatus = z.enum(["processing", "success", "fail"])
+export type TaskStatus = z.infer<typeof TaskStatus>
 
-  export const Source = z.enum(["api", "agent_tool"])
-  export type Source = z.infer<typeof Source>
+export const TaskSource = z.enum(["api", "agent_tool"])
+export type TaskSource = z.infer<typeof TaskSource>
 
-  export const Error = z.object({
-    code: z.string(),
-    message: z.string(),
-  })
-  export type Error = z.infer<typeof Error>
+export const TaskError = z.object({
+  code: z.string(),
+  message: z.string(),
+})
+export type TaskError = z.infer<typeof TaskError>
 
-  export const Input = z.record(z.string(), z.any())
-  export type Input = z.infer<typeof Input>
+export const TaskInput = z.record(z.string(), z.any())
+export type TaskInput = z.infer<typeof TaskInput>
 
-  export const Output = z.record(z.string(), z.any())
-  export type Output = z.infer<typeof Output>
+export const TaskOutput = z.record(z.string(), z.any())
+export type TaskOutput = z.infer<typeof TaskOutput>
 
-  export const Info = z.object({
-    id: z.string(),
-    project_id: z.string(),
-    session_id: z.string(),
-    type: Type,
-    status: Status,
-    source: Source,
-    created_by_agent: z.string().optional(),
-    created_by_run_id: z.string().optional(),
-    idempotency_key: z.string(),
-    input: Input,
-    output: Output.optional(),
-    error: Error.optional(),
-    time: z.object({
-      created: z.number(),
-      started: z.number().optional(),
-      finished: z.number().optional(),
-    }),
-  })
-  export type Info = z.infer<typeof Info>
+export const TaskInfo = z.object({
+  id: z.string(),
+  project_id: z.string(),
+  session_id: z.string(),
+  type: TaskType,
+  status: TaskStatus,
+  source: TaskSource,
+  created_by_agent: z.string().optional(),
+  created_by_run_id: z.string().optional(),
+  idempotency_key: z.string(),
+  input: TaskInput,
+  output: TaskOutput.optional(),
+  error: TaskError.optional(),
+  time: z.object({
+    created: z.number(),
+    started: z.number().optional(),
+    finished: z.number().optional(),
+  }),
+})
+export type TaskInfo = z.infer<typeof TaskInfo>
+
+export const Task = {
+  Type: TaskType,
+  Status: TaskStatus,
+  Source: TaskSource,
+  Error: TaskError,
+  Input: TaskInput,
+  Output: TaskOutput,
+  Info: TaskInfo,
 }
