@@ -31,6 +31,66 @@ export type OpenwriteFsReadResult = {
   limit: number
 }
 
+export type OpenwriteLibraryDoc = {
+  id: string
+  project_id: string
+  title: string
+  title_slug: string
+  source_type: "file" | "youtube"
+  source_url?: string
+  file_ext: "pdf" | "txt"
+  doc_path: string
+  summary_path: string
+  vector_ids: string[]
+  chunk_count: number
+  status: "ready" | "error"
+  created_at: number
+  updated_at: number
+}
+
+export type OpenwriteLibraryImport = {
+  id: string
+  project_id: string
+  input: {
+    mode: "file" | "url"
+    replace_doc_id?: string
+    file_name?: string
+    file_ext?: "pdf" | "txt"
+    file_mime?: string
+    file_size?: number
+    payload_path?: string
+    url?: string
+  }
+  status: "queued" | "processing" | "success" | "fail"
+  stage:
+    | "queued"
+    | "validating"
+    | "ingesting"
+    | "parsing"
+    | "summarizing_title"
+    | "chunking"
+    | "embedding"
+    | "pinecone_upsert"
+    | "writing_summary"
+    | "refresh_index"
+    | "success"
+    | "fail"
+  error?: {
+    code: string
+    message: string
+  }
+  result?: {
+    doc_id: string
+    doc_path: string
+    summary_path: string
+  }
+  time: {
+    created: number
+    started?: number
+    finished?: number
+  }
+}
+
 export type OpenwriteMessageInfo =
   | {
     id: string
@@ -266,6 +326,75 @@ export async function fetchFileContent(input: {
     },
   })
   return payload
+}
+
+export async function listLibraryDocs(input: {
+  projectID: string
+}) {
+  const payload = await requestJSON<{ docs: OpenwriteLibraryDoc[] }>("/api/openwrite/library/docs", {
+    method: "GET",
+    headers: {
+      "x-project-id": input.projectID,
+    },
+  })
+  return payload.docs
+}
+
+export async function createLibraryImport(input: {
+  projectID: string
+  file?: File
+  url?: string
+  replaceDocID?: string
+}) {
+  const formData = new FormData()
+  if (input.file) {
+    formData.set("file", input.file)
+  }
+  if (input.url?.trim()) {
+    formData.set("url", input.url.trim())
+  }
+  if (input.replaceDocID?.trim()) {
+    formData.set("replace_doc_id", input.replaceDocID.trim())
+  }
+
+  const response = await fetch("/api/openwrite/library/import", {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "x-project-id": input.projectID,
+    },
+    body: formData,
+  })
+
+  const payload = await response.json().catch(() => null) as
+    | { error?: string; code?: string; import?: { id: string; status: string; stage: string } }
+    | null
+
+  if (!response.ok) {
+    const message = payload?.error?.trim() || `HTTP ${response.status}`
+    const code = payload?.code?.trim()
+    throw new Error(code ? `${code}: ${message}` : message)
+  }
+  if (!payload?.import) {
+    throw new Error("Empty import response payload")
+  }
+  return payload.import
+}
+
+export async function getLibraryImport(input: {
+  projectID: string
+  importID: string
+}) {
+  const response = await requestJSON<{
+    import: OpenwriteLibraryImport
+    doc?: OpenwriteLibraryDoc
+  }>(`/api/openwrite/library/import/${encodeURIComponent(input.importID)}`, {
+    method: "GET",
+    headers: {
+      "x-project-id": input.projectID,
+    },
+  })
+  return response
 }
 
 export async function sendMessage(input: {

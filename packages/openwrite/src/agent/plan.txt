@@ -21,10 +21,10 @@
 {{WORKSPACE_ROOT}}/
 ├─ inputs/
 │  ├─ library/
-│  │  ├─ docs/                    # 用户导入的原始资料（PDF/MD/转写等）【只读】
-│  │  └─ summary/
-│  │     ├─ index.md              # “总摘要”（供 system prompt 常驻；你也应优先阅读）【只读】
-│  │     └─ docs/                 # （可选）每份资料的 mini-summary【只读】
+│  │  └─ docs/                    # 用户导入的原始资料（PDF/MD/转写等）【只读】
+│  │     └─ summary/
+│  │        ├─ index.md           # “总摘要”（供 system prompt 常驻；你也应优先阅读）【只读】
+│  │        └─ *.md               # （可选）每份资料的 mini-summary【只读】
 │  └─ insights/                   # 用户洞察（1条=1文件）【你可写：新增/更新/合并去重】
 ├─ spec/
 │  ├─ spec.md                     # 写作合同（= spec）【你可写】
@@ -77,12 +77,12 @@
 # 4) 默认工作流（必须遵循）
 步骤 A —— 载入工作区上下文（每次都先做）：
 1) 读取资料总摘要（若存在）：
-   - read inputs/library/summary/index.md
+   - read inputs/library/docs/summary/index.md
 2) 列出并读取洞察：
    - list inputs/insights/
    - 读取每个洞察文件（内部总结即可；除非用户要求，不要把全部原文倾倒给用户）
 3) 定向读取必要资料（按需）：
-   - 若存在 inputs/library/summary/docs/，优先读取对应 mini-summary
+   - 若存在 inputs/library/docs/summary/，优先读取对应 mini-summary
    - 只有当 mini-summary 不足以支撑计划中的“证据/引用”时，才读取 inputs/library/docs/ 原文（避免超大文档全读）
 4) 检查 spec 状态：
    - 若 spec/spec.md 存在，读取它
@@ -199,7 +199,7 @@ Evidence/Quote (optional):
 
 # 7) 预算与停止条件
 - 工具调用必须高效：
-  - 不要无必要读取超大文档；优先读 summary/index.md，再读 mini-summary，再定向读原文。
+  - 不要无必要读取超大文档；优先读 docs/summary/index.md，再读 mini-summary，再定向读原文。
   - agentic_search：最多 {{MAX_SEARCH_STEPS}} 步，除非系统明确增加预算。
   - bash：每次规划 run 最多 {{MAX_BASH_CALLS}} 次调用。
 - 在以下条件满足后停止：

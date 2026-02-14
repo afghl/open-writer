@@ -40,6 +40,9 @@ Browser requests stay same-origin to:
 - `/api/openwrite/projects`
 - `/api/openwrite/fs/tree`
 - `/api/openwrite/fs/read`
+- `/api/openwrite/library/import`
+- `/api/openwrite/library/import/[id]`
+- `/api/openwrite/library/docs`
 
 Those Vercel API routes forward server-to-server requests to `OW_API_BASE`, and inject:
 - `x-ow-proxy-token: <OW_PROXY_TOKEN>`

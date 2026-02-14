@@ -7,7 +7,7 @@ import { resolveWorkspacePath } from "@/path/workspace"
 
 const PROJECT_INIT_DIRS = [
   "inputs/library/docs",
-  "inputs/library/summary/docs",
+  "inputs/library/docs/summary",
   "inputs/insights",
   "spec",
   "article/chapters",
