@@ -19,6 +19,9 @@ type LibraryImportModalProps = {
   onImported?: () => void
 }
 
+const MAX_UPLOAD_MB = 4
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024
+
 const STAGE_LABELS: Record<OpenwriteLibraryImport["stage"], string> = {
   queued: "排队中",
   validating: "校验中",
@@ -139,6 +142,10 @@ export function LibraryImportModal({ open, projectID, onClose, onImported }: Lib
       setImportError("请选择 PDF 或 TXT 文件")
       return
     }
+    if (mode === "file" && file && file.size > MAX_UPLOAD_BYTES) {
+      setImportError(`文件过大，请上传不超过 ${MAX_UPLOAD_MB}MB 的文件`)
+      return
+    }
 
     if (mode === "url" && !url.trim()) {
       setImportError("请输入 YouTube URL")
@@ -234,6 +241,7 @@ export function LibraryImportModal({ open, projectID, onClose, onImported }: Lib
                   已选：{file.name} ({Math.round(file.size / 1024)} KB)
                 </p>
               )}
+              <p className="mt-1 text-xs text-stone-400">当前上线配置：单文件最大 {MAX_UPLOAD_MB}MB</p>
             </div>
           ) : (
             <div>

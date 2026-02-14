@@ -46,3 +46,8 @@ Browser requests stay same-origin to:
 
 Those Vercel API routes forward server-to-server requests to `OW_API_BASE`, and inject:
 - `x-ow-proxy-token: <OW_PROXY_TOKEN>`
+
+### Upload Note
+
+The current `/api/openwrite/library/import` path uploads through Vercel API routes.
+For stable production behavior, keep single upload files within 4MB, or change to direct backend/object-storage upload.

@@ -160,6 +160,10 @@ bun run dev:web
 - `OW_HOME`
 - `PORT`
 
+若 Web 部署在 Vercel 且文件上传走 `/api/openwrite/library/import` 代理链路，建议：
+- `OW_IMPORT_MAX_PDF_MB=4`
+- `OW_IMPORT_MAX_TXT_MB=4`
+
 参考：`packages/openwrite/.env.example`
 
 ### Web（`packages/web`）
@@ -191,7 +195,8 @@ CI 在 GitHub Actions 上执行 `bun run ci:check`。
 
 推荐拆分部署：
 1. `packages/web` 部署到 Vercel（Next.js）。
-2. `packages/openwrite` 部署到独立 Node/Bun 服务。
+2. `packages/openwrite` 部署到独立 Bun 服务。
 3. Web 通过服务器端 API route 代理后端，并携带共享 token。
+4. 若保留当前上传代理链路，请将单文件大小控制在 4MB 以内（Vercel 友好范围）。
 
 生产环境下若 `OW_API_BASE` 或 `OW_PROXY_TOKEN` 缺失，Web 代理请求会失败（不会回退到 localhost）。

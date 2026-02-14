@@ -1,5 +1,7 @@
 import { proxyErrorResponse, proxyFetch, relayStreamResponse } from "@/lib/openwrite-server"
 
+export const maxDuration = 300
+
 const PROJECT_ID_HEADER = "x-project-id"
 
 // Backward-compatible alias for /events/fs.

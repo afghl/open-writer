@@ -1,5 +1,7 @@
 import { proxyErrorResponse, proxyFetch, relayStreamResponse } from "@/lib/openwrite-server"
 
+export const maxDuration = 300
+
 const PROJECT_ID_HEADER = "x-project-id"
 
 export async function POST(request: Request) {

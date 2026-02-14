@@ -21,8 +21,9 @@ import {
   type SummaryRecord,
 } from "./types"
 
-const DEFAULT_IMPORT_MAX_PDF_MB = 30
-const DEFAULT_IMPORT_MAX_TXT_MB = 5
+// Keep defaults Vercel-friendly when Web uploads are proxied through API routes.
+const DEFAULT_IMPORT_MAX_PDF_MB = 4
+const DEFAULT_IMPORT_MAX_TXT_MB = 4
 
 function dataDir() {
   return process.env.OW_DATA_DIR ?? path.join(process.cwd(), ".openwrite")
