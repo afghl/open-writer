@@ -1,8 +1,11 @@
 import { BaseAgent, type PermissionRuleset } from "./types"
 import SYSTEM_PROMPT from "./plan.txt"
 import { rootHolder } from "@/global"
+import { SEARCH_TOOL_IDS } from "@/tool/search-shared"
 
-const defaultPermission: PermissionRuleset = {}
+const defaultPermission: PermissionRuleset = {
+  denyTools: Array.from(SEARCH_TOOL_IDS),
+}
 
 export class PlanAgent extends BaseAgent {
   constructor() {

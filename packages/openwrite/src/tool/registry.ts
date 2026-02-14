@@ -4,6 +4,9 @@ import { ReadTool } from "./read"
 import { EditTool } from "./edit"
 import { BashTool } from "./bash"
 import { HandoffToWriterTool } from "./handoff-to-writer"
+import { SearchCandidatesTool } from "./search-candidates"
+import { FetchChunksTool } from "./fetch-chunks"
+import { RerankTool } from "./rerank"
 
 export namespace ToolRegistry {
   const custom = new Map<string, Tool.Info>()
@@ -25,7 +28,15 @@ export namespace ToolRegistry {
   }
 
   export async function tools(agent?: Agent) {
-    const builtins = [ReadTool, EditTool, BashTool, HandoffToWriterTool]
+    const builtins = [
+      ReadTool,
+      EditTool,
+      BashTool,
+      HandoffToWriterTool,
+      SearchCandidatesTool,
+      FetchChunksTool,
+      RerankTool,
+    ]
     const filtered = filterTools([...builtins, ...custom.values()], agent)
     const result = await Promise.all(
       filtered.map(async (t) => ({

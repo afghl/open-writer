@@ -29,6 +29,7 @@ export namespace SessionPrompt {
     sessionID: z.string(),
     text: z.string().min(1),
     agent: z.string().optional(),
+    skipTitleGeneration: z.boolean().optional(),
   })
   export type PromptInput = z.infer<typeof PromptInput>
 
@@ -66,10 +67,16 @@ export namespace SessionPrompt {
       agent: agentInfo.name,
       runID,
     })
-    return loop(message.info.sessionID, message.info.run_id)
+    return loop(message.info.sessionID, message.info.run_id, {
+      skipTitleGeneration: input.skipTitleGeneration ?? false,
+    })
   }
 
-  export async function loop(sessionID: string, runID?: string) {
+  export async function loop(
+    sessionID: string,
+    runID?: string,
+    options?: { skipTitleGeneration?: boolean },
+  ) {
     const abort = start(sessionID)
     if (!abort) {
       return new Promise<Message.WithParts>((resolve, reject) => {
@@ -177,7 +184,9 @@ export namespace SessionPrompt {
           finishReason: lastResult.info.finish,
           parentUserMessageID: lastResult.info.parentID,
         })
-        await ensureTitleIfNeeded(sessionID, messages, lastResult)
+        if (!options?.skipTitleGeneration) {
+          await ensureTitleIfNeeded(sessionID, messages, lastResult)
+        }
       }
     } catch (caught) {
       error = caught

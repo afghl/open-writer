@@ -1,0 +1,24 @@
+import { expect, test } from "bun:test"
+
+test("search tools are isolated to search agent", async () => {
+  const { ToolRegistry } = await import("../../src/tool/registry")
+  const { PlanAgent } = await import("../../src/agent/plan")
+  const { GeneralAgent } = await import("../../src/agent/general")
+  const { WriterAgent } = await import("../../src/agent/writer")
+  const { SearchAgent } = await import("../../src/agent/search")
+
+  const planTools = await ToolRegistry.tools(new PlanAgent())
+  const generalTools = await ToolRegistry.tools(new GeneralAgent())
+  const writerTools = await ToolRegistry.tools(new WriterAgent())
+  const searchTools = await ToolRegistry.tools(new SearchAgent())
+
+  const searchToolIDs = ["search_candidates", "fetch_chunks", "rerank"]
+
+  for (const id of searchToolIDs) {
+    expect(planTools.some((tool) => tool.id === id)).toBe(false)
+    expect(generalTools.some((tool) => tool.id === id)).toBe(false)
+    expect(writerTools.some((tool) => tool.id === id)).toBe(false)
+  }
+
+  expect(searchTools.map((tool) => tool.id).sort()).toEqual(searchToolIDs.sort())
+})
