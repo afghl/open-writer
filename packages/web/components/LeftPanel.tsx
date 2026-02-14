@@ -1,10 +1,11 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { FolderGit2, ChevronLeft, ChevronRight, LayoutGrid, Settings, Sparkles } from "lucide-react";
 import { cn } from "../lib/utils";
 import { WorkspaceTree } from "./WorkspaceTree";
 import { MOCK_PROGRESS } from "../mock/data";
 import { FileNode } from "../types";
+import { LibraryImportModal } from "./LibraryImportModal";
 
 interface LeftPanelProps {
   collapsed: boolean;
@@ -29,6 +30,8 @@ export function LeftPanel({
   projectError,
   fsRefreshTick,
 }: LeftPanelProps) {
+  const [importOpen, setImportOpen] = useState(false);
+
   const projectSubtitle = projectError
     ? "backend unavailable"
     : projectLoading
@@ -93,6 +96,16 @@ export function LeftPanel({
               <span>Files</span>
               <LayoutGrid size={14} className="cursor-pointer hover:text-stone-600"/>
             </div>
+            <div className="px-4 mb-2">
+              <button
+                type="button"
+                className="w-full rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!projectID}
+                onClick={() => setImportOpen(true)}
+              >
+                导入资料
+              </button>
+            </div>
             <WorkspaceTree
               projectID={projectID}
               onSelect={onFileSelect}
@@ -116,6 +129,12 @@ export function LeftPanel({
              <span>Senior Engineer</span>
           </div>
       )}
+
+      <LibraryImportModal
+        open={importOpen}
+        projectID={projectID}
+        onClose={() => setImportOpen(false)}
+      />
     </div>
   );
 }

@@ -17,6 +17,9 @@ OpenWrite 是一个基于 Bun + Hono + Next.js 的多端 AI 写作/工作区助�
 - 文件系统能力：
   - 树：`GET /api/fs/tree`
   - 文件读取：`GET /api/fs/read`
+  - 资料导入：`POST /api/library/import`（异步）
+  - 导入状态：`GET /api/library/import/:id`
+  - 资料列表：`GET /api/library/docs`
   - 文件系统 SSE 事件：`GET /event/fs`
 - 内置工具：`read`、`edit`、`bash`（通过工具注册表接入模型调用）。
 - 路径安全：工作区路径会做越界检查，防止逃逸到项目外。
@@ -64,7 +67,6 @@ OpenWrite 是一个基于 Bun + Hono + Next.js 的多端 AI 写作/工作区助�
 
 3. 前端部分区域仍是占位
 - 左侧进度卡片使用 `MOCK_PROGRESS`。
-- 聊天输入区的附件相关按钮尚未接入真实上传流程。
 
 4. TUI 与 SSE 端点存在对齐问题
 - 当前 TUI 使用 `/event`，后端实际事件端点为 `/event/fs`。
@@ -103,6 +105,9 @@ packages/
 ### 工作区文件
 - `GET /api/fs/tree`
 - `GET /api/fs/read`
+- `POST /api/library/import`
+- `GET /api/library/import/:id`
+- `GET /api/library/docs`
 - `GET /event/fs` (SSE)
 
 ### 请求头约定
@@ -144,6 +149,11 @@ bun run dev:web
 常用：
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
+- `PINECONE_API_KEY`
+- `OW_PINECONE_INDEX`
+- `OW_EMBEDDING_MODEL`
+- `OW_IMPORT_MAX_PDF_MB`
+- `OW_IMPORT_MAX_TXT_MB`
 - `OW_DATA_DIR`
 - `OW_LOG_DIR`
 - `OW_LOG_LEVEL`
