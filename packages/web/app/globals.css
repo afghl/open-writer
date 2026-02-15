@@ -32,3 +32,72 @@ body {
   width: 1px;
   background-color: #e7e5e4;
 }
+
+@keyframes owLineFlash {
+  0% {
+    background-color: rgba(251, 191, 36, 0.45);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes owTreeFlashCreated {
+  0% {
+    background-color: rgba(74, 222, 128, 0.28);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes owTreeFlashUpdated {
+  0% {
+    background-color: rgba(250, 204, 21, 0.28);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes owTreeFlashDeleted {
+  0% {
+    background-color: rgba(248, 113, 113, 0.26);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes owTreeFlashMoved {
+  0% {
+    background-color: rgba(56, 189, 248, 0.24);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.ow-line-flash {
+  animation: owLineFlash 2000ms ease-out;
+}
+
+.ow-tree-flash-created {
+  animation: owTreeFlashCreated 2000ms ease-out;
+}
+
+.ow-tree-flash-updated {
+  animation: owTreeFlashUpdated 2000ms ease-out;
+}
+
+.ow-tree-flash-deleted {
+  animation: owTreeFlashDeleted 2000ms ease-out;
+}
+
+.ow-tree-flash-moved {
+  animation: owTreeFlashMoved 2000ms ease-out;
+}
+
+.ow-tree-flash-moved-old {
+  animation: owTreeFlashDeleted 2000ms ease-out;
+}

@@ -4,7 +4,7 @@ import { FolderGit2, ChevronLeft, ChevronRight, LayoutGrid, Settings, Sparkles }
 import { cn } from "../lib/utils";
 import { WorkspaceTree } from "./WorkspaceTree";
 import { MOCK_PROGRESS } from "../mock/data";
-import { FileNode } from "../types";
+import { FileNode, type FsEvent } from "../types";
 import { LibraryImportModal } from "./LibraryImportModal";
 
 interface LeftPanelProps {
@@ -17,6 +17,7 @@ interface LeftPanelProps {
   projectLoading: boolean;
   projectError: string | null;
   fsRefreshTick: number;
+  fsEvent: FsEvent | null;
 }
 
 export function LeftPanel({
@@ -29,6 +30,7 @@ export function LeftPanel({
   projectLoading,
   projectError,
   fsRefreshTick,
+  fsEvent,
 }: LeftPanelProps) {
   const [importOpen, setImportOpen] = useState(false);
 
@@ -111,6 +113,7 @@ export function LeftPanel({
               onSelect={onFileSelect}
               selectedId={selectedFileId}
               fsRefreshTick={fsRefreshTick}
+              fsEvent={fsEvent}
             />
           </>
         )}

@@ -1,17 +1,76 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LeftPanel } from "./LeftPanel";
 import { FilePreviewPanel } from "./FilePreviewPanel";
 import { ChatPanel } from "./ChatPanel";
-import { FileNode } from "../types";
+import { FileNode, type FsEvent, type FsEventType } from "../types";
 import { cn } from "../lib/utils";
 import { createProject, listProjects, type OpenwriteProject } from "@/lib/openwrite-client";
 
 type AppShellProps = {
   projectSlug?: string | null
+}
+
+const FS_EVENT_NAMES: FsEventType[] = ["fs.created", "fs.updated", "fs.deleted", "fs.moved"];
+
+function parseFsEvent(eventName: FsEventType, rawData: string, token: number): FsEvent | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawData) as unknown;
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+
+  const payload = parsed as Record<string, unknown>;
+  const source = payload.source;
+  const kind = payload.kind;
+  const path = payload.path;
+  const projectID = payload.projectID;
+  const time = payload.time;
+
+  if (
+    typeof projectID !== "string"
+    || typeof path !== "string"
+    || (kind !== "file" && kind !== "dir")
+    || (source !== "agent_tool" && source !== "api" && source !== "external_upload")
+    || typeof time !== "number"
+    || Number.isNaN(time)
+  ) {
+    return null;
+  }
+
+  const event: FsEvent = {
+    token,
+    type: eventName,
+    projectID,
+    path,
+    kind,
+    source,
+    time,
+  };
+
+  if (eventName === "fs.moved" && typeof payload.oldPath === "string" && payload.oldPath.length > 0) {
+    event.oldPath = payload.oldPath;
+  }
+
+  return event;
+}
+
+function fileNodeFromPath(filePath: string): FileNode {
+  const name = filePath.split("/").filter(Boolean).at(-1) ?? filePath;
+  return {
+    id: filePath,
+    name,
+    type: "file",
+    path: filePath,
+  };
 }
 
 export default function AppShell({ projectSlug }: AppShellProps) {
@@ -29,8 +88,15 @@ export default function AppShell({ projectSlug }: AppShellProps) {
   const [emptyProjects, setEmptyProjects] = useState(false);
   const [creatingProject, setCreatingProject] = useState(false);
   const [fsRefreshTick, setFsRefreshTick] = useState(0);
+  const [fsEvent, setFsEvent] = useState<FsEvent | null>(null);
+  const fsEventTokenRef = useRef(0);
+  const selectedFileRef = useRef<FileNode | null>(null);
   const projectID = project?.id ?? null;
   const projectTitle = project?.title ?? "OpenWrite Project";
+
+  useEffect(() => {
+    selectedFileRef.current = selectedFile;
+  }, [selectedFile]);
 
   useEffect(() => {
     let active = true;
@@ -79,24 +145,50 @@ export default function AppShell({ projectSlug }: AppShellProps) {
   useEffect(() => {
     setSelectedFile(null);
     setPreviewCollapsed(true);
+    setFsEvent(null);
+    setFsRefreshTick(0);
   }, [projectID]);
 
   useEffect(() => {
     if (!projectID) return;
 
     const source = new EventSource(`/events/fs?project_id=${encodeURIComponent(projectID)}`);
-    const onFsChange = () => {
-      setFsRefreshTick((tick) => tick + 1);
-    };
-    const fsEventNames = ["fs.created", "fs.updated", "fs.deleted", "fs.moved"];
+    const listeners: Array<{ eventName: FsEventType; handler: (event: MessageEvent) => void }> = [];
 
-    for (const eventName of fsEventNames) {
-      source.addEventListener(eventName, onFsChange);
+    for (const eventName of FS_EVENT_NAMES) {
+      const handler = (event: MessageEvent) => {
+        setFsRefreshTick((tick) => tick + 1);
+        if (typeof event.data !== "string" || event.data.length === 0) {
+          return;
+        }
+        const nextEvent = parseFsEvent(eventName, event.data, ++fsEventTokenRef.current);
+        if (!nextEvent) {
+          return;
+        }
+        setFsEvent(nextEvent);
+
+        if (nextEvent.kind !== "file") {
+          return;
+        }
+
+        if (nextEvent.type === "fs.deleted") {
+          if (selectedFileRef.current?.path === nextEvent.path) {
+            setSelectedFile(null);
+            setPreviewCollapsed(true);
+          }
+          return;
+        }
+
+        setSelectedFile(fileNodeFromPath(nextEvent.path));
+        setPreviewCollapsed(false);
+      };
+      listeners.push({ eventName, handler });
+      source.addEventListener(eventName, handler as EventListener);
     }
 
     return () => {
-      for (const eventName of fsEventNames) {
-        source.removeEventListener(eventName, onFsChange);
+      for (const listener of listeners) {
+        source.removeEventListener(listener.eventName, listener.handler as EventListener);
       }
       source.close();
     };
@@ -157,6 +249,7 @@ export default function AppShell({ projectSlug }: AppShellProps) {
           projectLoading={projectLoading}
           projectError={projectError}
           fsRefreshTick={fsRefreshTick}
+          fsEvent={fsEvent}
         />
       </aside>
 
@@ -169,7 +262,7 @@ export default function AppShell({ projectSlug }: AppShellProps) {
       >
         <FilePreviewPanel 
           projectID={projectID}
-          fsRefreshTick={fsRefreshTick}
+          fsEvent={fsEvent}
           file={selectedFile} 
           onClose={handleClosePreview} 
         />

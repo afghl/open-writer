@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Folder, FolderOpen, FileCode2, File, ChevronRight, ChevronDown } from "lucide-react";
-import { FileNode } from "../types";
+import { FileNode, type FsEvent } from "../types";
 import { cn } from "../lib/utils";
 import { fetchFileTree, type OpenwriteFsNode } from "@/lib/openwrite-client";
 
@@ -14,9 +14,43 @@ const FileIcon = ({ name }: { name: string }) => {
     return <File size={16} className="text-stone-400" />;
 }
 
-const TreeNode = ({ node, level, onSelect, selectedId }: { node: FileNode, level: number, onSelect: (n: FileNode) => void, selectedId?: string }) => {
+function highlightClassForPath(nodePath: string, event: FsEvent | null) {
+  if (!event) return "";
+  if (event.type === "fs.moved" && event.oldPath === nodePath) {
+    return "ow-tree-flash-moved-old";
+  }
+  if (event.path !== nodePath) {
+    return "";
+  }
+  if (event.type === "fs.created") return "ow-tree-flash-created";
+  if (event.type === "fs.updated") return "ow-tree-flash-updated";
+  if (event.type === "fs.deleted") return "ow-tree-flash-deleted";
+  return "ow-tree-flash-moved";
+}
+
+function highlightTokenForPath(nodePath: string, event: FsEvent | null) {
+  if (!event) return 0;
+  if (event.path === nodePath) return event.token;
+  if (event.type === "fs.moved" && event.oldPath === nodePath) return event.token;
+  return 0;
+}
+
+const TreeNode = ({
+  node,
+  level,
+  onSelect,
+  selectedId,
+  fsEvent,
+}: {
+  node: FileNode
+  level: number
+  onSelect: (n: FileNode) => void
+  selectedId?: string
+  fsEvent: FsEvent | null
+}) => {
   const [isOpen, setIsOpen] = useState(true);
   const isSelected = selectedId === node.id;
+  const highlightClass = highlightClassForPath(node.path, fsEvent);
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,7 +67,8 @@ const TreeNode = ({ node, level, onSelect, selectedId }: { node: FileNode, level
         onClick={handleClick}
         className={cn(
           "flex items-center gap-2 py-1.5 px-2 mx-2 rounded-md cursor-pointer transition-all duration-200 text-sm font-medium group",
-          isSelected ? "bg-white shadow-sm ring-1 ring-stone-200 text-stone-900" : "hover:bg-stone-200/50 text-stone-500 hover:text-stone-700"
+          isSelected ? "bg-white shadow-sm ring-1 ring-stone-200 text-stone-900" : "hover:bg-stone-200/50 text-stone-500 hover:text-stone-700",
+          highlightClass,
         )}
         style={{ paddingLeft: `${level * 14 + 10}px` }}
       >
@@ -62,11 +97,12 @@ const TreeNode = ({ node, level, onSelect, selectedId }: { node: FileNode, level
              {/* Simple visual guide line could go here */}
           {node.children.map((child) => (
             <TreeNode 
-              key={child.id} 
+              key={`${child.id}:${highlightTokenForPath(child.path, fsEvent)}`}
               node={child} 
               level={level + 1} 
               onSelect={onSelect}
               selectedId={selectedId}
+              fsEvent={fsEvent}
             />
           ))}
         </div>
@@ -90,11 +126,13 @@ export function WorkspaceTree({
   onSelect,
   selectedId,
   fsRefreshTick,
+  fsEvent,
 }: {
   projectID: string | null
   onSelect: (node: FileNode) => void
   selectedId?: string
   fsRefreshTick: number
+  fsEvent: FsEvent | null
 }) {
   const [nodes, setNodes] = useState<FileNode[]>([]);
   const [loading, setLoading] = useState(false);
@@ -143,7 +181,14 @@ export function WorkspaceTree({
         <div className="px-5 py-3 text-xs text-stone-400">Workspace is empty.</div>
       )}
       {nodes.map((node) => (
-        <TreeNode key={node.id} node={node} level={0} onSelect={onSelect} selectedId={selectedId} />
+        <TreeNode
+          key={`${node.id}:${highlightTokenForPath(node.path, fsEvent)}`}
+          node={node}
+          level={0}
+          onSelect={onSelect}
+          selectedId={selectedId}
+          fsEvent={fsEvent}
+        />
       ))}
     </div>
   );
