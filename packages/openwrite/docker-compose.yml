@@ -1,0 +1,34 @@
+services:
+  openwrite:
+    build:
+      context: ../..
+      dockerfile: packages/openwrite/Dockerfile
+    image: openwrite-backend:latest
+    container_name: openwrite-backend
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      OW_NAMESPACE: /var/lib/openwrite/namespace
+      OW_DATA_DIR: /var/lib/openwrite/data
+      OW_LOG_DIR: /var/log/openwrite
+    ports:
+      - "127.0.0.1:${OW_PORT:-3000}:3000"
+    volumes:
+      - ./docker-data/namespace:/var/lib/openwrite/namespace
+      - ./docker-data/data:/var/lib/openwrite/data
+      - ./docker-data/log:/var/log/openwrite
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
