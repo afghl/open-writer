@@ -33,3 +33,18 @@ export type ProjectProgress = {
   doneTasks: number;
   lastUpdated: string;
 };
+
+export type FsEventType = "fs.created" | "fs.updated" | "fs.deleted" | "fs.moved";
+export type FsEventKind = "file" | "dir";
+export type FsEventSource = "agent_tool" | "api" | "external_upload";
+
+export type FsEvent = {
+  token: number;
+  type: FsEventType;
+  projectID: string;
+  path: string;
+  kind: FsEventKind;
+  source: FsEventSource;
+  time: number;
+  oldPath?: string;
+};

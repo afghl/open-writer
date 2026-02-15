@@ -1,22 +1,65 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { X, FileCode2, Pin, History } from "lucide-react";
-import { FileNode } from "../types";
+import { FileNode, type FsEvent } from "../types";
+import { cn } from "../lib/utils";
 import { fetchFileContent, type OpenwriteFsReadResult } from "@/lib/openwrite-client";
+
+const PREVIEW_ANIMATION_MS = 2_000;
+
+function findChangedLineIndexes(before: string, after: string) {
+  const beforeLines = before.split(/\r?\n/);
+  const afterLines = after.split(/\r?\n/);
+  const max = Math.max(beforeLines.length, afterLines.length);
+  const changed: number[] = [];
+
+  for (let index = 0; index < max; index += 1) {
+    if (beforeLines[index] !== afterLines[index]) {
+      changed.push(index);
+    }
+  }
+
+  return changed;
+}
+
+function shouldAnimateForFile(event: FsEvent | null, filePath: string) {
+  if (!event || event.kind !== "file") return false;
+  if (event.type === "fs.deleted") return false;
+  if (event.type === "fs.moved") {
+    return event.path === filePath || event.oldPath === filePath;
+  }
+  return event.path === filePath;
+}
 
 interface FilePreviewPanelProps {
   projectID: string | null;
-  fsRefreshTick: number;
+  fsEvent: FsEvent | null;
   file: FileNode | null;
   onClose: () => void;
 }
 
-export function FilePreviewPanel({ projectID, fsRefreshTick, file, onClose }: FilePreviewPanelProps) {
+export function FilePreviewPanel({ projectID, fsEvent, file, onClose }: FilePreviewPanelProps) {
   const [content, setContent] = useState("");
   const [meta, setMeta] = useState<OpenwriteFsReadResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [highlightedLines, setHighlightedLines] = useState<Set<number>>(new Set());
+  const contentRef = useRef("");
+  const clearHighlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    contentRef.current = content;
+  }, [content]);
+
+  useEffect(() => {
+    return () => {
+      if (clearHighlightTimerRef.current) {
+        clearTimeout(clearHighlightTimerRef.current);
+        clearHighlightTimerRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -25,11 +68,13 @@ export function FilePreviewPanel({ projectID, fsRefreshTick, file, onClose }: Fi
       setMeta(null);
       setError(null);
       setLoading(false);
+      setHighlightedLines(new Set());
       return () => {
         active = false;
       };
     }
 
+    const animate = shouldAnimateForFile(fsEvent, file.path);
     const loadFile = async () => {
       setLoading(true);
       setError(null);
@@ -41,8 +86,25 @@ export function FilePreviewPanel({ projectID, fsRefreshTick, file, onClose }: Fi
           limit: 2000,
         });
         if (!active) return;
+        const nextContent = result.content;
+        const previousContent = contentRef.current;
         setMeta(result);
-        setContent(result.content);
+        setContent(nextContent);
+
+        if (!animate) {
+          setHighlightedLines(new Set());
+          return;
+        }
+
+        const nextHighlighted = new Set(findChangedLineIndexes(previousContent, nextContent));
+        setHighlightedLines(nextHighlighted);
+        if (clearHighlightTimerRef.current) {
+          clearTimeout(clearHighlightTimerRef.current);
+        }
+        clearHighlightTimerRef.current = setTimeout(() => {
+          setHighlightedLines(new Set());
+          clearHighlightTimerRef.current = null;
+        }, PREVIEW_ANIMATION_MS);
       } catch (e) {
         if (!active) return;
         setError(e instanceof Error ? e.message : String(e));
@@ -57,7 +119,7 @@ export function FilePreviewPanel({ projectID, fsRefreshTick, file, onClose }: Fi
     return () => {
       active = false;
     };
-  }, [projectID, file, fsRefreshTick]);
+  }, [projectID, file, fsEvent]);
 
   const lines = useMemo(() => {
     if (!content) return [""];
@@ -110,7 +172,19 @@ export function FilePreviewPanel({ projectID, fsRefreshTick, file, onClose }: Fi
               {error && <div className="text-red-500">Failed to load file: {error}</div>}
               {!loading && !error && (
                 <>
-                  <pre className="whitespace-pre-wrap break-words">{content || ""}</pre>
+                  <div className="space-y-0">
+                    {lines.map((line, index) => (
+                      <div
+                        key={index}
+                        className={cn(
+                          "whitespace-pre-wrap break-words rounded-[2px] px-1 -mx-1",
+                          highlightedLines.has(index) && "ow-line-flash",
+                        )}
+                      >
+                        {line.length > 0 ? line : " "}
+                      </div>
+                    ))}
+                  </div>
                   {meta?.truncated && (
                     <div className="mt-2 text-xs text-stone-400">
                       Truncated at {meta.limit} lines ({meta.totalLines} total lines).
