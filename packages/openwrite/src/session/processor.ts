@@ -22,6 +22,10 @@ type CreateInput = {
   agentRef?: Agent
 }
 
+
+const log = Log.create({
+  service: "processor.create",
+})
 export const create = (input: CreateInput) => {
   const toolcalls = new Map<string, MessageToolPart>()
 
@@ -49,6 +53,7 @@ export const create = (input: CreateInput) => {
       })
 
       for await (const value of stream.fullStream) {
+        // log.info("stream value", { type: value.type })
         switch (value.type) {
           case "text-start": {
             currentText = {

@@ -5,6 +5,8 @@ WORKDIR /app
 # Install workspace dependencies with lockfile for reproducible builds.
 COPY package.json bun.lock ./
 COPY packages/openwrite/package.json ./packages/openwrite/package.json
+COPY packages/web/package.json ./packages/web/package.json
+COPY packages/tui/package.json ./packages/tui/package.json
 RUN bun install --frozen-lockfile
 
 # Copy backend source only.

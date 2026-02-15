@@ -24,6 +24,6 @@ export type {
   UserMessage,
   AssistantMessage,
 } from "./message"
-export { LLM, stream as streamLLM, type LLMStreamInput } from "./llm"
+export { LLM, type LLMStreamInput } from "./llm"
 export { SessionPrompt, PromptInput, type PromptInput as SessionPromptInput } from "./prompt"
 export { SessionProcessor } from "./processor"

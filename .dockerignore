@@ -1,0 +1,9 @@
+.git
+.gitignore
+**/node_modules
+**/.DS_Store
+**/.openwrite
+packages/openwrite/docker-data
+packages/openwrite/.env
+packages/openwrite/.env.docker
+packages/web/.env
