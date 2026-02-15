@@ -34,7 +34,7 @@ export async function stream(input: LLMStreamInput) {
     baseURL: process.env.OPENAI_BASE_URL,
   })
   const agentInfo = input.agentRef?.Info()
-  let modelID = "gpt-4o-mini"
+  let modelID = "gpt-5.2"
   if (agentInfo?.model) {
     if (agentInfo.model.providerID !== "openai") {
       log.warn("Unsupported provider for agent model", {

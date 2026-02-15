@@ -71,6 +71,16 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
 
   const messageListRef = useRef<OpenwriteMessageWithParts[]>([]);
   const sendingAbortRef = useRef<AbortController | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const didInitialAutoScrollRef = useRef(false);
+
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = "auto") => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    requestAnimationFrame(() => {
+      container.scrollTo({ top: container.scrollHeight, behavior });
+    });
+  }, []);
 
   const refreshMessages = useCallback(async (input?: { lastMessageID?: string }) => {
     const payload = await listMessages({
@@ -97,6 +107,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
     setSending(false);
     setOptimisticUserMessage(null);
     setStreamingAssistantMessages([]);
+    didInitialAutoScrollRef.current = false;
   }, [projectID]);
 
   useEffect(() => {
@@ -157,6 +168,17 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
     });
   }, [messages, optimisticUserMessage, streamingAssistantMessages]);
 
+  useEffect(() => {
+    if (loading || didInitialAutoScrollRef.current) return;
+    didInitialAutoScrollRef.current = true;
+    scrollToBottom();
+  }, [displayMessages.length, loading, scrollToBottom]);
+
+  useEffect(() => {
+    if (!sending) return;
+    scrollToBottom();
+  }, [displayMessages, scrollToBottom, sending]);
+
   const status = sending ? "busy" : "idle";
 
   const handleSend = useCallback(async () => {
@@ -189,6 +211,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
         pending: true,
       },
     ]);
+    scrollToBottom();
 
     const onStreamEvent = (event: MessageStreamEvent) => {
       if (event.type === "user_ack") {
@@ -345,7 +368,7 @@ export function ChatPanel({ projectID }: ChatPanelProps) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 scrollbar-hide bg-white">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 scrollbar-hide bg-white">
         {loading && <div className="max-w-3xl mx-auto text-sm text-stone-400">Loading messages...</div>}
         {!loading && displayMessages.length === 0 && (
           <div className="max-w-3xl mx-auto text-sm text-stone-400">No messages yet.</div>
