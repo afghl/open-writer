@@ -80,7 +80,7 @@ export async function embedChunks(input: {
     }))
   }
 
-  const llm = LLM.embedding("library.embedding")
+  const llm = LLM.for("library.embedding")
 
   const result = await Promise.race([
     llm.embedMany({

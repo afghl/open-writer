@@ -52,7 +52,7 @@ async function rerankByLLM(input: {
   topK: number
   signal?: AbortSignal
 }) {
-  const llm = LLM.language("tool.rerank")
+  const llm = LLM.for("tool.rerank")
   const content = input.candidates
     .map((item, index) => [
       `Candidate ${index + 1}`,

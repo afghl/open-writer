@@ -115,7 +115,7 @@ test("language.generateText merges defaults with call args and deep-merges provi
     },
   }
 
-  const llm = LLM.language("tool.rerank")
+  const llm = LLM.for("tool.rerank")
   await llm.generateText({
     model: llm.model,
     prompt: "rank the candidates",
@@ -173,7 +173,7 @@ test("language streamText respects scene model override and merges stream defaul
     },
   }
 
-  const llm = LLM.language("session.chat", {
+  const llm = LLM.for("session.chat", {
     modelId: "gpt-custom-chat",
   })
 
@@ -217,7 +217,7 @@ test("embedding embedMany merges defaults and keeps call-level override preceden
     },
   }
 
-  const llm = LLM.embedding("search.embedding", {
+  const llm = LLM.for("search.embedding", {
     modelId: "text-embedding-3-large",
   })
   await llm.embedMany({

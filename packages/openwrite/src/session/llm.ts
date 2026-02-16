@@ -81,7 +81,7 @@ export async function stream(input: LLMStreamInput) {
   log.info("call llm request. ", {
     tools: Object.keys(tools),
   })
-  const llm = SharedLLM.language(
+  const llm = SharedLLM.for(
     "session.chat",
     agentModelId ? { modelId: agentModelId } : undefined,
   )

@@ -31,7 +31,7 @@ export async function embedTexts(input: {
     return [] as number[][]
   }
 
-  const llm = LLM.embedding("search.embedding")
+  const llm = LLM.for("search.embedding")
   const vectors: number[][] = []
 
   for (let start = 0; start < input.texts.length; start += EMBEDDING_BATCH_SIZE) {

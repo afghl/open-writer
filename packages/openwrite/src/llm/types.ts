@@ -70,6 +70,7 @@ export type EmbeddingSceneClient = {
 }
 
 export interface LLMService {
-  language(sceneId: LanguageSceneId, options?: SceneBindingOptions): LanguageSceneClient
-  embedding(sceneId: EmbeddingSceneId, options?: SceneBindingOptions): EmbeddingSceneClient
+  for(sceneId: LanguageSceneId, options?: SceneBindingOptions): LanguageSceneClient
+  for(sceneId: EmbeddingSceneId, options?: SceneBindingOptions): EmbeddingSceneClient
+  for(sceneId: LLMSceneId, options?: SceneBindingOptions): LanguageSceneClient | EmbeddingSceneClient
 }

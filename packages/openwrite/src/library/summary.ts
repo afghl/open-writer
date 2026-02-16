@@ -85,7 +85,7 @@ export async function buildSummary(input: {
   if (!apiKey) {
     return fallbackSummary(input.text)
   }
-  const llm = LLM.language("library.summary")
+  const llm = LLM.for("library.summary")
 
   const prompt = [
     "You are extracting a concise writing-library summary.",
