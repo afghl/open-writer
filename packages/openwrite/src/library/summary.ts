@@ -1,8 +1,7 @@
-import { createOpenAI } from "@ai-sdk/openai"
-import { generateObject } from "ai"
 import { z } from "zod"
 import type { SummaryRecord } from "./types"
 import { Log } from "@/util"
+import { LLM } from "@/llm"
 
 
 const log = Log.create({ service: "library.summary" })
@@ -86,10 +85,7 @@ export async function buildSummary(input: {
   if (!apiKey) {
     return fallbackSummary(input.text)
   }
-  const provider = createOpenAI({
-    apiKey,
-    baseURL: process.env.OPENAI_BASE_URL,
-  })
+  const llm = LLM.language("library.summary")
 
   const prompt = [
     "You are extracting a concise writing-library summary.",
@@ -107,8 +103,8 @@ export async function buildSummary(input: {
 
   try {
     const result = await Promise.race([
-      generateObject({
-        model: provider("gpt-5.1"),
+      llm.generateObject({
+        model: llm.model,
         schema: RawSummarySchema,
         prompt,
       }),

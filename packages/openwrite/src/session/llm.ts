@@ -1,11 +1,11 @@
-import { createOpenAI } from "@ai-sdk/openai"
-import { streamText, tool, zodSchema } from "ai"
+import { tool, zodSchema } from "ai"
 import type { ModelMessage, Tool as AITool } from "ai"
 import type { Agent } from "@/agent"
 import type { MessageWithParts, UserMessage } from "./message"
 import type { ToolContext, ToolInfo } from "@/tool"
 import { Permission } from "@/permission"
 import { Log } from "@/util"
+import { LLM as SharedLLM } from "@/llm"
 
 export type LLMStreamInput = {
   sessionID?: string
@@ -25,26 +25,17 @@ export async function stream(input: LLMStreamInput) {
     service: "llm.stream", sessionID: input.sessionID,
     messageID: input.messageID,
   })
-  const apiKey = process.env.OPENAI_API_KEY
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not set")
-  }
-  const provider = createOpenAI({
-    apiKey,
-    baseURL: process.env.OPENAI_BASE_URL,
-  })
   const agentInfo = input.agentRef?.Info()
-  let modelID = "gpt-5.2"
+  let agentModelId: string | undefined
   if (agentInfo?.model) {
     if (agentInfo.model.providerID !== "openai") {
       log.warn("Unsupported provider for agent model", {
         providerID: agentInfo.model.providerID,
       })
     } else {
-      modelID = agentInfo.model.modelID
+      agentModelId = agentInfo.model.modelID
     }
   }
-  const model = provider(modelID)
 
   const tools: Record<string, AITool> = {}
   for (const item of input.tools) {
@@ -76,7 +67,6 @@ export async function stream(input: LLMStreamInput) {
     .filter(Boolean)
     .join("\n")
   const req = {
-    model,
     abortSignal: input.abort,
     messages: input.messages,
     ...(agentInfo?.temperature !== undefined
@@ -91,7 +81,14 @@ export async function stream(input: LLMStreamInput) {
   log.info("call llm request. ", {
     tools: Object.keys(tools),
   })
-  const result = await streamText(req)
+  const llm = SharedLLM.language(
+    "session.chat",
+    agentModelId ? { modelId: agentModelId } : undefined,
+  )
+  const result = await llm.streamText({
+    ...req,
+    model: llm.model,
+  })
   return result
 }
 

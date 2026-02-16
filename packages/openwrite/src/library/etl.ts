@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto"
-import { createOpenAI } from "@ai-sdk/openai"
-import { embedMany } from "ai"
 import { LibraryServiceError, type ChunkRecord, type EmbeddingRecord } from "./types"
+import { LLM } from "@/llm"
 
 const DEFAULT_CHUNK_SIZE = 800
 const DEFAULT_CHUNK_OVERLAP = 120
@@ -66,7 +65,6 @@ export function chunkText(input: {
 export async function embedChunks(input: {
   chunks: ChunkRecord[]
   requireRemoteEmbedding: boolean
-  modelID?: string
 }): Promise<EmbeddingRecord[]> {
   const apiKey = process.env.OPENAI_API_KEY?.trim() ?? ""
   if (!apiKey) {
@@ -82,15 +80,11 @@ export async function embedChunks(input: {
     }))
   }
 
-  const provider = createOpenAI({
-    apiKey,
-    baseURL: process.env.OPENAI_BASE_URL,
-  })
-  const model = provider.textEmbeddingModel(input.modelID?.trim() || process.env.OW_EMBEDDING_MODEL?.trim() || "text-embedding-3-small")
+  const llm = LLM.embedding("library.embedding")
 
   const result = await Promise.race([
-    embedMany({
-      model,
+    llm.embedMany({
+      model: llm.model,
       values: input.chunks.map((chunk) => chunk.text),
     }),
     new Promise<never>((_, reject) => {

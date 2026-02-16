@@ -1,7 +1,6 @@
 import z from "zod"
-import { createOpenAI } from "@ai-sdk/openai"
-import { generateText } from "ai"
 import { Tool } from "./tool"
+import { LLM } from "@/llm"
 
 const DESCRIPTION = "Rerank candidate chunks with LLM reasoning and return top-k evidence."
 
@@ -53,16 +52,7 @@ async function rerankByLLM(input: {
   topK: number
   signal?: AbortSignal
 }) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is not set")
-  }
-
-  const provider = createOpenAI({
-    apiKey,
-    baseURL: process.env.OPENAI_BASE_URL,
-  })
-
+  const llm = LLM.language("tool.rerank")
   const content = input.candidates
     .map((item, index) => [
       `Candidate ${index + 1}`,
@@ -73,8 +63,8 @@ async function rerankByLLM(input: {
     ].join("\n"))
     .join("\n\n")
 
-  const response = await generateText({
-    model: provider("gpt-4o-mini"),
+  const response = await llm.generateText({
+    model: llm.model,
     abortSignal: input.signal,
     system: [
       "You are a retrieval reranker.",
