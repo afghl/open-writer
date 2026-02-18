@@ -120,7 +120,7 @@ export const User = Base.extend({
       created: z.number(),
     }),
     agent: z.string(),
-    run_id: z.string(),
+    thread_id: z.string(),
   }).meta({ ref: "UserMessage" })
 export type UserMessage = z.infer<typeof User>
 
@@ -128,7 +128,7 @@ export const Assistant = Base.extend({
     role: z.literal("assistant"),
     parentID: z.string(),
     agent: z.string(),
-    run_id: z.string(),
+    thread_id: z.string(),
     time: z.object({
       created: z.number(),
       completed: z.number().optional(),

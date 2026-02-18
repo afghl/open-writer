@@ -4,8 +4,8 @@ export type OpenwriteProject = {
   title: string
   curr_session_id: string
   curr_agent_name: string
-  root_run_id: string
-  curr_run_id: string
+  root_thread_id: string
+  curr_thread_id: string
   phase: "planning" | "writing"
   time: {
     created: number
@@ -97,7 +97,7 @@ export type OpenwriteMessageInfo =
     sessionID: string
     role: "user"
     agent: string
-    run_id: string
+    thread_id: string
     time: {
       created: number
     }
@@ -108,7 +108,7 @@ export type OpenwriteMessageInfo =
     role: "assistant"
     parentID: string
     agent: string
-    run_id: string
+    thread_id: string
     finish?: "other" | "length" | "unknown" | "error" | "stop" | "content-filter" | "tool-calls"
     time: {
       created: number
@@ -194,7 +194,7 @@ export type OpenwriteTask = {
   status: OpenwriteTaskStatus
   source: "api" | "agent_tool"
   created_by_agent?: string
-  created_by_run_id?: string
+  created_by_thread_id?: string
   idempotency_key: string
   input: Record<string, unknown>
   output?: Record<string, unknown>

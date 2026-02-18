@@ -58,7 +58,7 @@ test("rerank falls back to fused score ordering when LLM is unavailable", async 
       sessionID: "session-1",
       messageID: "message-1",
       agent: "search",
-      runID: "run-1",
+      threadID: "thread-1",
       projectID: "project-1",
       abort: new AbortController().signal,
       messages: [],

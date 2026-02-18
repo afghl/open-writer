@@ -13,8 +13,8 @@ test("summarizer outputs stable handoff sections", async () => {
       source: "api",
       idempotency_key: "key",
       input: {
-        from_run_id: "run-a",
-        to_run_id: "run-b",
+        from_thread_id: "thread-a",
+        to_thread_id: "thread-b",
         target_agent_name: "writer",
       },
       time: {
@@ -22,8 +22,8 @@ test("summarizer outputs stable handoff sections", async () => {
       },
     },
     handoffInput: {
-      from_run_id: "run-a",
-      to_run_id: "run-b",
+      from_thread_id: "thread-a",
+      to_thread_id: "thread-b",
       target_agent_name: "writer",
       reason: "spec locked and ready",
     },
@@ -39,7 +39,7 @@ test("summarizer outputs stable handoff sections", async () => {
           sessionID: "session-1",
           role: "user",
           agent: "plan",
-          run_id: "run-a",
+          thread_id: "thread-a",
           time: { created: Date.now() - 1000 },
         },
         parts: [
@@ -59,7 +59,7 @@ test("summarizer outputs stable handoff sections", async () => {
           role: "assistant",
           parentID: "m1",
           agent: "plan",
-          run_id: "run-a",
+          thread_id: "thread-a",
           time: { created: Date.now() - 900, completed: Date.now() - 800 },
           finish: "stop",
         },
@@ -80,10 +80,10 @@ test("summarizer outputs stable handoff sections", async () => {
   expect(text).toContain("# Writing Objective")
   expect(text).toContain("# Constraints")
   expect(text).toContain("# Outstanding Risks")
-  expect(text).toContain("# Previous Run Summary")
+  expect(text).toContain("# Previous Thread Summary")
   expect(text).toContain("# Action Request")
-  expect(text).toContain("run-a")
-  expect(text).toContain("run-b")
+  expect(text).toContain("thread-a")
+  expect(text).toContain("thread-b")
   expect(text).toContain("writer")
   expect(text).toContain("engineering managers")
 })

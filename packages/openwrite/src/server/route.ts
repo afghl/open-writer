@@ -51,7 +51,7 @@ const searchScopeInput = z.object({
   paths: z.array(z.string().min(1)).optional(),
   extensions: z.array(z.string().min(1)).optional(),
 })
-const searchAgentRunInput = z.object({
+const searchAgentThreadInput = z.object({
   query: z.string().min(1),
   scope: searchScopeInput.optional(),
   k: z.coerce.number().int().min(1).max(50).optional(),
@@ -548,16 +548,16 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Session ID is required" }, 422)
     }
 
-    const fromRunID = project.curr_run_id || project.root_run_id
-    const toRunID = Identifier.ascending("run")
+    const fromThreadID = project.curr_thread_id || project.root_thread_id
+    const toThreadID = Identifier.ascending("thread")
     const idempotencyKey = parsed.data.idempotency_key?.trim()
       || TaskService.fallbackIdempotencyKey({
         projectID,
         sessionID: project.curr_session_id,
         type: "handoff",
         payload: {
-          from_run_id: fromRunID,
-          to_run_id: "__next_run__",
+          from_thread_id: fromThreadID,
+          to_thread_id: "__next_thread__",
           target_agent_name: parsed.data.input.target_agent_name,
         },
       })
@@ -570,10 +570,10 @@ export function setupRoutes(app: Hono) {
         source: "api",
         idempotencyKey,
         createdByAgent: project.curr_agent_name,
-        createdByRunID: fromRunID,
+        createdByThreadID: fromThreadID,
         input: {
-          from_run_id: fromRunID,
-          to_run_id: toRunID,
+          from_thread_id: fromThreadID,
+          to_thread_id: toThreadID,
           target_agent_name: parsed.data.input.target_agent_name,
         },
       })
@@ -616,7 +616,7 @@ export function setupRoutes(app: Hono) {
     }
   })
 
-  app.post("/api/search-agent/run", async (c) => {
+  app.post("/api/search-agent/thread", async (c) => {
     let body
     try {
       body = await c.req.json()
@@ -624,7 +624,7 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Invalid JSON body" }, 400)
     }
 
-    const parsed = searchAgentRunInput.safeParse(body)
+    const parsed = searchAgentThreadInput.safeParse(body)
     if (!parsed.success) {
       return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
     }
@@ -797,7 +797,7 @@ export function setupRoutes(app: Hono) {
     try {
       const allMessages = await Session.messages({
         sessionID,
-        defaultRunID: project.root_run_id,
+        defaultThreadID: project.root_thread_id,
       })
       const filteredMessages = filterRenderableMessages(allMessages)
       const lastMessageID = parsed.data.last_message_id?.trim()

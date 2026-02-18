@@ -12,7 +12,7 @@ export type ToolContext<M extends ToolMetadata = ToolMetadata> = {
   sessionID: string
   messageID: string
   agent: string
-  runID: string
+  threadID: string
   projectID: string
   abort: AbortSignal
   callID?: string

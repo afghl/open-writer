@@ -47,7 +47,7 @@ export async function stream(input: LLMStreamInput) {
           sessionID: input.sessionID,
           messageID: input.messageID,
           agent: agentInfo?.name ?? "",
-          runID: input.user.run_id,
+          threadID: input.user.thread_id,
           projectID: input.projectID,
           abort: input.abort,
           callID: options.toolCallId,

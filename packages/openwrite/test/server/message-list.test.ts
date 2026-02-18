@@ -37,7 +37,7 @@ beforeAll(async () => {
     role: "user",
     sessionID: session.id,
     agent: "plan",
-    run_id: "run-test",
+    thread_id: "thread-test",
     time: {
       created: now,
     },
@@ -56,7 +56,7 @@ beforeAll(async () => {
     sessionID: session.id,
     parentID: userMessageID,
     agent: "plan",
-    run_id: "run-test",
+    thread_id: "thread-test",
     finish: "tool-calls",
     time: {
       created: now + 1,
@@ -91,7 +91,7 @@ beforeAll(async () => {
     role: "user",
     sessionID: session.id,
     agent: "plan",
-    run_id: "run-test",
+    thread_id: "thread-test",
     time: {
       created: now + 3,
     },
@@ -110,7 +110,7 @@ beforeAll(async () => {
     sessionID: session.id,
     parentID: userMessageIDNoName,
     agent: "plan",
-    run_id: "run-test",
+    thread_id: "thread-test",
     finish: "tool-calls",
     time: {
       created: now + 4,

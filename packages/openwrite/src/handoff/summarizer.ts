@@ -57,8 +57,8 @@ export function toUserMessage(input: {
     const lines: string[] = []
     lines.push("# Handoff Meta")
     lines.push(`- task_id: ${input.task.id}`)
-    lines.push(`- from_run_id: ${input.handoffInput.from_run_id}`)
-    lines.push(`- to_run_id: ${input.handoffInput.to_run_id}`)
+    lines.push(`- from_thread_id: ${input.handoffInput.from_thread_id}`)
+    lines.push(`- to_thread_id: ${input.handoffInput.to_thread_id}`)
     lines.push(`- target_agent: ${input.handoffInput.target_agent_name}`)
     if (input.handoffInput.reason?.trim()) {
       lines.push(`- handoff_reason: ${input.handoffInput.reason.trim()}`)
@@ -85,7 +85,7 @@ export function toUserMessage(input: {
       }
     }
     lines.push("")
-    lines.push("# Previous Run Summary")
+    lines.push("# Previous Thread Summary")
     if (historySummary.length === 0) {
       lines.push("- No meaningful prior conversation content found.")
     } else {
@@ -95,7 +95,7 @@ export function toUserMessage(input: {
     }
     lines.push("")
     lines.push("# Action Request")
-    lines.push("- Start writing in this run based on this handoff package.")
+    lines.push("- Start writing in this thread based on this handoff package.")
 
   return lines.join("\n")
 }

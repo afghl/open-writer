@@ -6,7 +6,7 @@ import path from "node:path"
 let namespaceRoot = ""
 
 beforeAll(async () => {
-  namespaceRoot = await mkdtemp(path.join(os.tmpdir(), "openwrite-messages-by-run-"))
+  namespaceRoot = await mkdtemp(path.join(os.tmpdir(), "openwrite-messages-by-thread-"))
   process.env.OW_NAMESPACE = namespaceRoot
   process.env.OW_DATA_DIR = path.join(namespaceRoot, "data")
 })
@@ -17,7 +17,7 @@ afterAll(async () => {
   }
 })
 
-test("messagesByRun filters history by run_id", async () => {
+test("messagesByThread filters history by thread_id", async () => {
   const { Project } = await import("../../src/project")
   const { Session } = await import("../../src/session")
 
@@ -31,7 +31,7 @@ test("messagesByRun filters history by run_id", async () => {
     sessionID: session.id,
     role: "user",
     agent: "plan",
-    run_id: "run-a",
+    thread_id: "thread-a",
     time: { created: Date.now() },
   })
   await Session.updatePart({
@@ -39,14 +39,14 @@ test("messagesByRun filters history by run_id", async () => {
     sessionID: session.id,
     messageID: "message-1",
     type: "text",
-    text: "run a",
+    text: "thread a",
   })
   await Session.updateMessage({
     id: "message-2",
     sessionID: session.id,
     role: "user",
     agent: "writer",
-    run_id: "run-b",
+    thread_id: "thread-b",
     time: { created: Date.now() + 1 },
   })
   await Session.updatePart({
@@ -54,23 +54,22 @@ test("messagesByRun filters history by run_id", async () => {
     sessionID: session.id,
     messageID: "message-2",
     type: "text",
-    text: "run b",
+    text: "thread b",
   })
 
-  const runA = await Session.messagesByRun({
+  const threadA = await Session.messagesByThread({
     sessionID: session.id,
-    runID: "run-a",
-    defaultRunID: project.root_run_id,
+    threadID: "thread-a",
+    defaultThreadID: project.root_thread_id,
   })
-  const runB = await Session.messagesByRun({
+  const threadB = await Session.messagesByThread({
     sessionID: session.id,
-    runID: "run-b",
-    defaultRunID: project.root_run_id,
+    threadID: "thread-b",
+    defaultThreadID: project.root_thread_id,
   })
 
-  expect(runA).toHaveLength(1)
-  expect(runA[0]?.info.id).toBe("message-1")
-  expect(runB).toHaveLength(1)
-  expect(runB[0]?.info.id).toBe("message-2")
+  expect(threadA).toHaveLength(1)
+  expect(threadA[0]?.info.id).toBe("message-1")
+  expect(threadB).toHaveLength(1)
+  expect(threadB[0]?.info.id).toBe("message-2")
 })
-

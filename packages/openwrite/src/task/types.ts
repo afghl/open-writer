@@ -29,7 +29,7 @@ export const TaskInfo = z.object({
   status: TaskStatus,
   source: TaskSource,
   created_by_agent: z.string().optional(),
-  created_by_run_id: z.string().optional(),
+  created_by_thread_id: z.string().optional(),
   idempotency_key: z.string(),
   input: TaskInput,
   output: TaskOutput.optional(),

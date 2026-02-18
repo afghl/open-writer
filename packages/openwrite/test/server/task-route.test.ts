@@ -105,16 +105,16 @@ test("task API creates and completes handoff task", async () => {
   const project = await Project.get(projectID)
   expect(project.phase).toBe("writing")
   expect(project.curr_agent_name).toBe("writer")
-  expect(project.curr_run_id).not.toBe(project.root_run_id)
+  expect(project.curr_thread_id).not.toBe(project.root_thread_id)
 
   const messages = await Session.messages({
     sessionID,
-    defaultRunID: project.root_run_id,
+    defaultThreadID: project.root_thread_id,
   })
   const handoffMessage = messages.find(
     (message) =>
       message.info.role === "user"
-      && message.info.run_id === project.curr_run_id
+      && message.info.thread_id === project.curr_thread_id
       && message.info.agent === "writer",
   )
   expect(handoffMessage).toBeDefined()

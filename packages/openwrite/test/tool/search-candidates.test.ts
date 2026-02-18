@@ -56,7 +56,7 @@ test("search_candidates returns ranked candidates and degrades vector when key m
       sessionID: "session-1",
       messageID: "message-1",
       agent: "search",
-      runID: "run-1",
+      threadID: "thread-1",
       projectID,
       abort: new AbortController().signal,
       messages: [],

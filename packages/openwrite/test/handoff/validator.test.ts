@@ -46,8 +46,8 @@ test("validator accepts locked handoff files", async () => {
     source: "api" as const,
     idempotency_key: "k",
     input: {
-      from_run_id: project.root_run_id,
-      to_run_id: "run-next",
+      from_thread_id: project.root_thread_id,
+      to_thread_id: "thread-next",
       target_agent_name: "writer",
     },
     time: {
@@ -89,8 +89,8 @@ test("validator fails when lock exists but not locked", async () => {
     source: "api" as const,
     idempotency_key: "k-2",
     input: {
-      from_run_id: project.root_run_id,
-      to_run_id: "run-next",
+      from_thread_id: project.root_thread_id,
+      to_thread_id: "thread-next",
       target_agent_name: "writer",
     },
     time: {

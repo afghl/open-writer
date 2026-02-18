@@ -30,7 +30,7 @@ mock.module("@/session/prompt", () => ({
           sessionID: input.sessionID,
           parentID: "message_user_search",
           agent: "search",
-          run_id: "run-search",
+          thread_id: "thread-search",
           finish: "stop",
           time: {
             created: Date.now(),
@@ -109,7 +109,7 @@ test("search-agent route uses search agent without mutating active project sessi
   const app = new Hono()
   setupRoutes(app)
 
-  const response = await app.request("http://localhost/api/search-agent/run", {
+  const response = await app.request("http://localhost/api/search-agent/thread", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -149,7 +149,7 @@ test("search-agent route uses search agent without mutating active project sessi
   const after = await Project.get(projectID)
   expect(after.curr_agent_name).toBe(before.curr_agent_name)
   expect(after.curr_session_id).toBe(before.curr_session_id)
-  expect(after.curr_run_id).toBe(before.curr_run_id)
+  expect(after.curr_thread_id).toBe(before.curr_thread_id)
   expect(after.title).toBe(before.title)
   expect(payload.session_id).not.toBe(before.curr_session_id)
 })

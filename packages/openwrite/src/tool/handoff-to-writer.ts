@@ -25,11 +25,11 @@ export const HandoffToWriterTool = Tool.define("handoff_to_writer", async () => 
       throw new Error("Current project has no active session.")
     }
 
-    const fromRunID = project.curr_run_id || project.root_run_id || ctx.runID
-    const toRunID = Identifier.ascending("run")
+    const fromThreadID = project.curr_thread_id || project.root_thread_id || ctx.threadID
+    const toThreadID = Identifier.ascending("thread")
     const payload = {
-      from_run_id: fromRunID,
-      to_run_id: toRunID,
+      from_thread_id: fromThreadID,
+      to_thread_id: toThreadID,
       target_agent_name: "writer",
       trigger_message_id: ctx.messageID,
       reason: params.reason.trim(),
@@ -40,7 +40,7 @@ export const HandoffToWriterTool = Tool.define("handoff_to_writer", async () => 
       type: "handoff",
       source: "agent_tool",
       createdByAgent: ctx.agent,
-      createdByRunID: ctx.runID,
+      createdByThreadID: ctx.threadID,
       input: payload,
       idempotencyKey: TaskService.fallbackIdempotencyKey({
         projectID: ctx.projectID,
@@ -48,7 +48,7 @@ export const HandoffToWriterTool = Tool.define("handoff_to_writer", async () => 
         type: "handoff",
         payload: {
           ...payload,
-          to_run_id: "__next_run__",
+          to_thread_id: "__next_thread__",
         },
       }),
     })
@@ -70,4 +70,3 @@ export const HandoffToWriterTool = Tool.define("handoff_to_writer", async () => 
     }
   },
 }))
-

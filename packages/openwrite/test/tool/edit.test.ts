@@ -47,7 +47,7 @@ test("edit tool publishes fs.updated after successful write", async () => {
       sessionID: "s1",
       messageID: "m1",
       agent: "plan",
-      runID: "run-1",
+      threadID: "thread-1",
       projectID,
       abort: new AbortController().signal,
       messages: [],

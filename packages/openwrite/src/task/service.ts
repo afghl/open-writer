@@ -10,7 +10,7 @@ type CreateInput = {
   input: TaskInput
   idempotencyKey?: string
   createdByAgent?: string
-  createdByRunID?: string
+  createdByThreadID?: string
 }
 
 function stableStringify(value: unknown): string {
@@ -71,7 +71,7 @@ export async function createOrGetByIdempotency(input: CreateInput) {
     status: "processing",
     source: input.source,
     created_by_agent: input.createdByAgent,
-    created_by_run_id: input.createdByRunID,
+    created_by_thread_id: input.createdByThreadID,
     idempotency_key: idempotencyKey,
     input: input.input,
     time: {

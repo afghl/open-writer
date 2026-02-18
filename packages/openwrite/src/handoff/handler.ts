@@ -14,10 +14,10 @@ export const handoffTaskHandler: TaskHandler = {
     const project = await Project.get(task.project_id)
     const validation = await HandoffValidator.validate({ project, task })
     const handoffInput = validation.input
-    const history = await Session.messagesByRun({
+    const history = await Session.messagesByThread({
       sessionID: task.session_id,
-      runID: handoffInput.from_run_id,
-      defaultRunID: project.root_run_id,
+      threadID: handoffInput.from_thread_id,
+      defaultThreadID: project.root_thread_id,
     })
     const text = HandoffSummarizer.toUserMessage({
       task,
@@ -33,7 +33,7 @@ export const handoffTaskHandler: TaskHandler = {
       role: "user",
       sessionID: task.session_id,
       agent: handoffInput.target_agent_name,
-      run_id: handoffInput.to_run_id,
+      thread_id: handoffInput.to_thread_id,
       time: {
         created: createdAt,
       },
@@ -56,7 +56,7 @@ export const handoffTaskHandler: TaskHandler = {
     await Project.update(task.project_id, (draft) => {
       draft.curr_agent_name = handoffInput.target_agent_name
       draft.phase = "writing"
-      draft.curr_run_id = handoffInput.to_run_id
+      draft.curr_thread_id = handoffInput.to_thread_id
     })
 
     return {

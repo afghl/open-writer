@@ -27,7 +27,7 @@ const createUserInfo = (id: string) => ({
   role: "user" as const,
   time: { created: 1 },
   agent: "test",
-  run_id: "run-1",
+  thread_id: "thread-1",
 })
 
 const createAssistantInfo = (id: string) => ({
@@ -36,7 +36,7 @@ const createAssistantInfo = (id: string) => ({
   role: "assistant" as const,
   parentID: "parent-1",
   agent: "test",
-  run_id: "run-1",
+  thread_id: "thread-1",
   time: { created: 2 },
 })
 

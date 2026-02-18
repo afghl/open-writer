@@ -2,8 +2,8 @@ import { z } from "zod"
 import type { TaskInfo } from "@/task"
 
 export const HandoffTaskInput = z.object({
-  from_run_id: z.string(),
-  to_run_id: z.string(),
+  from_thread_id: z.string(),
+  to_thread_id: z.string(),
   target_agent_name: z.string(),
   trigger_message_id: z.string().optional(),
   reason: z.string().optional(),

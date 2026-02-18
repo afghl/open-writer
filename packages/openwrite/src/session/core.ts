@@ -120,29 +120,29 @@ export async function parts(messageID: string) {
   return result
 }
 
-function attachRunID(info: MessageInfo, defaultRunID = ""): MessageInfo {
-  const runID = "run_id" in info && typeof info.run_id === "string" && info.run_id.length > 0
-    ? info.run_id
-    : defaultRunID
+function attachThreadID(info: MessageInfo, defaultThreadID = ""): MessageInfo {
+  const threadID = "thread_id" in info && typeof info.thread_id === "string" && info.thread_id.length > 0
+    ? info.thread_id
+    : defaultThreadID
   if (info.role === "user") {
     return {
       ...info,
-      run_id: runID,
+      thread_id: threadID,
     }
   }
   return {
     ...info,
-    run_id: runID,
+    thread_id: threadID,
   }
 }
 
-export async function messages(input: { sessionID: string; limit?: number; defaultRunID?: string }) {
+export async function messages(input: { sessionID: string; limit?: number; defaultThreadID?: string }) {
   const result: MessageWithParts[] = []
   const items = await Storage.list(["message", input.sessionID])
   for (const item of items) {
     if (input.limit && result.length >= input.limit) break
     const raw = await Storage.read<MessageInfo>(item)
-    const info = attachRunID(raw, input.defaultRunID ?? "")
+    const info = attachThreadID(raw, input.defaultThreadID ?? "")
     const msgParts = await parts(info.id)
     result.push({ info, parts: msgParts })
   }
@@ -150,18 +150,18 @@ export async function messages(input: { sessionID: string; limit?: number; defau
   return result
 }
 
-export async function messagesByRun(input: {
+export async function messagesByThread(input: {
   sessionID: string
-  runID: string
+  threadID: string
   limit?: number
-  defaultRunID?: string
+  defaultThreadID?: string
 }) {
   const all = await messages({
     sessionID: input.sessionID,
     limit: input.limit,
-    defaultRunID: input.defaultRunID,
+    defaultThreadID: input.defaultThreadID,
   })
-  return all.filter((message) => message.info.run_id === input.runID)
+  return all.filter((message) => message.info.thread_id === input.threadID)
 }
 
 export const Session = {
@@ -176,5 +176,5 @@ export const Session = {
   updatePart,
   parts,
   messages,
-  messagesByRun,
+  messagesByThread,
 }

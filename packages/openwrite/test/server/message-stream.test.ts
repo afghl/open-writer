@@ -13,7 +13,7 @@ type PromptResult = {
     role: "assistant"
     parentID: string
     agent: string
-    run_id: string
+    thread_id: string
     finish: "other" | "length" | "unknown" | "error" | "stop" | "content-filter" | "tool-calls"
     time: {
       created: number
@@ -69,7 +69,7 @@ function assistantResult(input: {
       role: "assistant",
       parentID: input.parentID,
       agent: "plan",
-      run_id: "run-test",
+      thread_id: "thread-test",
       finish: input.finish,
       time: {
         created: input.createdAt,

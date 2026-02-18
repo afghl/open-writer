@@ -31,8 +31,8 @@ export const ProjectInfoSchema = z.object({
   title: z.string(),
   curr_session_id: z.string(),
   curr_agent_name: z.string(),
-  root_run_id: z.string(),
-  curr_run_id: z.string(),
+  root_thread_id: z.string(),
+  curr_thread_id: z.string(),
   phase: ProjectPhase,
   time: z.object({
     created: z.number(),
@@ -49,22 +49,22 @@ function ensureProjectSlug(info: ProjectInfo): ProjectInfo {
   }
 }
 
-  function fallbackRootRunID(projectID: string) {
-    return `run_${projectID}`
-  }
+function fallbackRootThreadID(projectID: string) {
+  return `thread_${projectID}`
+}
 
-function ensureRunIDs(info: ProjectInfo): ProjectInfo {
-    const root = info.root_run_id?.trim() ? info.root_run_id : fallbackRootRunID(info.id)
-    const curr = info.curr_run_id?.trim() ? info.curr_run_id : root
-    if (root === info.root_run_id && curr === info.curr_run_id) {
-      return info
-    }
-    return {
-      ...info,
-      root_run_id: root,
-      curr_run_id: curr,
-    }
+function ensureThreadIDs(info: ProjectInfo): ProjectInfo {
+  const root = info.root_thread_id?.trim() ? info.root_thread_id : fallbackRootThreadID(info.id)
+  const curr = info.curr_thread_id?.trim() ? info.curr_thread_id : root
+  if (root === info.root_thread_id && curr === info.curr_thread_id) {
+    return info
   }
+  return {
+    ...info,
+    root_thread_id: root,
+    curr_thread_id: curr,
+  }
+}
 
 export function defaultTitle() {
   return `New project - ${new Date().toISOString()}`
@@ -82,21 +82,21 @@ export async function create(input: {
   title?: string
   curr_session_id?: string
   curr_agent_name: string
-  curr_run_id?: string
-  root_run_id?: string
+  curr_thread_id?: string
+  root_thread_id?: string
   phase?: ProjectPhase
 }) {
   const id = Identifier.ascending("project")
-  const rootRunID = input.root_run_id?.trim() || Identifier.ascending("run")
-  const currRunID = input.curr_run_id?.trim() || rootRunID
+  const rootThreadID = input.root_thread_id?.trim() || Identifier.ascending("thread")
+  const currThreadID = input.curr_thread_id?.trim() || rootThreadID
   const info: ProjectInfo = {
     id,
     project_slug: id,
     title: input.title ?? defaultTitle(),
     curr_session_id: input.curr_session_id ?? "",
     curr_agent_name: input.curr_agent_name,
-    root_run_id: rootRunID,
-    curr_run_id: currRunID,
+    root_thread_id: rootThreadID,
+    curr_thread_id: currThreadID,
     phase: input.phase ?? "planning",
     time: {
       created: Date.now(),
@@ -110,13 +110,13 @@ export async function create(input: {
 
 export async function get(projectID: string) {
   const info = await Storage.read<ProjectInfo>(["project", projectID])
-  return ensureRunIDs(ensureProjectSlug(info))
+  return ensureThreadIDs(ensureProjectSlug(info))
 }
 
 export async function list() {
   const ids = await Storage.list(["project"])
   const all = await Promise.all(
-    ids.map(async (segments) => ensureRunIDs(ensureProjectSlug(await Storage.read<ProjectInfo>(segments)))),
+    ids.map(async (segments) => ensureThreadIDs(ensureProjectSlug(await Storage.read<ProjectInfo>(segments)))),
   )
   all.sort((a, b) => b.time.updated - a.time.updated)
   return all
@@ -127,11 +127,11 @@ export async function update(projectID: string, editor: (draft: ProjectInfo) => 
     if (!draft.project_slug?.trim()) {
       draft.project_slug = draft.id
     }
-    if (!draft.root_run_id?.trim()) {
-      draft.root_run_id = fallbackRootRunID(draft.id)
+    if (!draft.root_thread_id?.trim()) {
+      draft.root_thread_id = fallbackRootThreadID(draft.id)
     }
-    if (!draft.curr_run_id?.trim()) {
-      draft.curr_run_id = draft.root_run_id
+    if (!draft.curr_thread_id?.trim()) {
+      draft.curr_thread_id = draft.root_thread_id
     }
     editor(draft)
     draft.time.updated = Date.now()

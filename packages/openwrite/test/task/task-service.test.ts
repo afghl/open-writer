@@ -27,8 +27,8 @@ test("createOrGetByIdempotency returns the same task for duplicate requests", as
     source: "api",
     idempotencyKey: "same-key",
     input: {
-      from_run_id: "run-a",
-      to_run_id: "run-b",
+      from_thread_id: "thread-a",
+      to_thread_id: "thread-b",
       target_agent_name: "writer",
     },
   })
@@ -39,8 +39,8 @@ test("createOrGetByIdempotency returns the same task for duplicate requests", as
     source: "api",
     idempotencyKey: "same-key",
     input: {
-      from_run_id: "run-a",
-      to_run_id: "run-c",
+      from_thread_id: "thread-a",
+      to_thread_id: "thread-c",
       target_agent_name: "writer",
     },
   })
@@ -48,7 +48,7 @@ test("createOrGetByIdempotency returns the same task for duplicate requests", as
   expect(first.created).toBe(true)
   expect(second.created).toBe(false)
   expect(second.task.id).toBe(first.task.id)
-  expect(second.task.input.to_run_id).toBe("run-b")
+  expect(second.task.input.to_thread_id).toBe("thread-b")
 
   await TaskService.markFail(first.task.id, {
     code: "TEST_DONE",

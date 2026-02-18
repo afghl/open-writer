@@ -11,7 +11,7 @@ export {
   updatePart,
   parts,
   messages,
-  messagesByRun,
+  messagesByThread,
 } from "./core"
 export type { SessionInfo, SessionStatus as Status } from "./core"
 export { Message, toModelMessages } from "./message"

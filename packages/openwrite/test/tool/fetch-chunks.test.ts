@@ -51,7 +51,7 @@ test("fetch_chunks returns requested chunks and preserves order", async () => {
     sessionID: "session-1",
     messageID: "message-1",
     agent: "search",
-    runID: "run-1",
+    threadID: "thread-1",
     projectID,
     abort: new AbortController().signal,
     messages: [],

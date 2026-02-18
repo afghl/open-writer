@@ -61,20 +61,20 @@ export async function prompt(input: PromptInput) {
   const agentInfo = agent.Info()
   const session = await Session.get(input.sessionID)
   const project = await Project.get(session.projectID)
-  const runID = project.curr_run_id || project.root_run_id
+  const threadID = project.curr_thread_id || project.root_thread_id
   const message = await createUserMessage({
     ...input,
     agent: agentInfo.name,
-    runID,
+    threadID,
   })
-  return loop(message.info.sessionID, message.info.run_id, {
+  return loop(message.info.sessionID, message.info.thread_id, {
     skipTitleGeneration: input.skipTitleGeneration ?? false,
   })
 }
 
 export async function loop(
   sessionID: string,
-  runID?: string,
+  threadID?: string,
   options?: { skipTitleGeneration?: boolean },
 ) {
   const abort = start(sessionID)
@@ -90,8 +90,8 @@ export async function loop(
   const session = await Session.get(sessionID)
   const projectID = session.projectID
   const project = await Project.get(projectID)
-  const rootRunID = project.root_run_id
-  const activeRunID = runID?.trim() || project.curr_run_id || rootRunID
+  const rootThreadID = project.root_thread_id
+  const activeThreadID = threadID?.trim() || project.curr_thread_id || rootThreadID
 
   try {
     while (true) {
@@ -99,10 +99,10 @@ export async function loop(
         throw new DOMException("Aborted", "AbortError")
       }
 
-      const messages = await Session.messagesByRun({
+      const messages = await Session.messagesByThread({
         sessionID,
-        runID: activeRunID,
-        defaultRunID: rootRunID,
+        threadID: activeThreadID,
+        defaultThreadID: rootThreadID,
       })
       const lastUser = [...messages].reverse().find((msg) => msg.info.role === "user")
       if (!lastUser || lastUser.info.role !== "user") {
@@ -145,7 +145,7 @@ export async function loop(
         sessionID,
         parentID: lastUser.info.id,
         agent: agentInfo.name,
-        run_id: activeRunID,
+        thread_id: activeThreadID,
         time: {
           created: Date.now(),
         },
@@ -219,14 +219,14 @@ export async function loop(
 }
 
 async function createUserMessage(
-  input: PromptInput & { agent: string; runID: string },
+  input: PromptInput & { agent: string; threadID: string },
 ): Promise<MessageWithParts> {
   const info: UserMessage = {
     id: Identifier.ascending("message"),
     role: "user",
     sessionID: input.sessionID,
     agent: input.agent,
-    run_id: input.runID,
+    thread_id: input.threadID,
     time: {
       created: Date.now(),
     },
