@@ -2,8 +2,8 @@ import z from "zod"
 import { Tool, type ToolContext } from "./tool"
 import DESCRIPTION from "./bash.txt"
 import { rootHolder } from "@/global"
-import { resolveWorkspaceDir, rewriteCommandWorkspacePaths } from "@/path"
-import { Log } from "@/util"
+import { resolveWorkspaceDir, rewriteCommandWorkspacePaths } from "@/util/workspace-path"
+import { Log } from "@/util/log"
 const DEFAULT_TIMEOUT = 120_000
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024

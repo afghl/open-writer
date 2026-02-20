@@ -1,6 +1,6 @@
 import { z } from "zod"
 import type { SummaryRecord } from "./types"
-import { Log } from "@/util"
+import { Log } from "@/util/log"
 import { LLM } from "@/llm"
 
 

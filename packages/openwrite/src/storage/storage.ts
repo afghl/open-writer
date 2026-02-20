@@ -1,14 +1,13 @@
 import fs from "node:fs/promises"
 import path from "node:path"
-
-const BASE_DIR = process.env.OW_DATA_DIR ?? path.join(process.cwd(), ".openwrite")
+import { openwriteDataDir } from "@/util/data-dir"
 
 function toFilePath(segments: string[]) {
-  return path.join(BASE_DIR, ...segments) + ".json"
+  return path.join(openwriteDataDir(), ...segments) + ".json"
 }
 
 function toDirPath(segments: string[]) {
-  return path.join(BASE_DIR, ...segments)
+  return path.join(openwriteDataDir(), ...segments)
 }
 
 async function ensureDir(dir: string) {

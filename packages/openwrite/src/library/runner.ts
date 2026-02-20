@@ -1,4 +1,4 @@
-import { Log } from "@/util"
+import { Log } from "@/util/log"
 import { LibraryImportService } from "./service"
 
 const POLL_INTERVAL_MS = 1_000

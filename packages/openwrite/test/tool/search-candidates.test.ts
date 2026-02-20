@@ -31,7 +31,7 @@ afterAll(async () => {
 })
 
 test("search_candidates returns ranked candidates and degrades vector when key missing", async () => {
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { SearchCandidatesTool } = await import("../../src/tool/search-candidates")
   const { resetSearchCache } = await import("../../src/search/cache")
 

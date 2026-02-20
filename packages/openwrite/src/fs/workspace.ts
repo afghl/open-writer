@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
-import { resolveWorkspacePath } from "@/path"
+import { logicalWorkspaceRoot, resolveWorkspacePath } from "@/util/workspace-path"
 import type { FsNode, FsReadResult } from "./types"
 import { FsServiceError } from "./types"
 
@@ -84,7 +84,7 @@ export async function listTree(input: {
   path?: string
   depth?: number
 }): Promise<{ root: FsNode }> {
-  const targetPath = input.path?.trim() || `projects/${input.projectID}/workspace`
+  const targetPath = input.path?.trim() || logicalWorkspaceRoot(input.projectID)
   try {
     const root = await buildNode(targetPath, input.projectID, normalizeDepth(input.depth))
     if (root.kind !== "dir") {

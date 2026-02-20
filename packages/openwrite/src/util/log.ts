@@ -1,9 +1,9 @@
-import path from "path"
-import fs from "fs/promises"
+import fs from "node:fs/promises"
+import path from "node:path"
 import { Global } from "@/global"
 import z from "zod"
 
-export const LogLevel = z.enum(["DEBUG", "INFO", "WARN", "ERROR"]).meta({ ref: "LogLevel", description: "Log level" })
+export const LogLevel = z.enum(["DEBUG", "INFO", "WARN", "ERROR"])
 export type LogLevel = z.infer<typeof LogLevel>
 
 const levelPriority: Record<LogLevel, number> = {
@@ -12,6 +12,7 @@ const levelPriority: Record<LogLevel, number> = {
   WARN: 2,
   ERROR: 3,
 }
+const KEEP_LOG_FILES = 10
 
 let level: LogLevel = "INFO"
 
@@ -19,16 +20,18 @@ function shouldLog(input: LogLevel): boolean {
   return levelPriority[input] >= levelPriority[level]
 }
 
+type LogExtra = Record<string, unknown>
+
 export type Logger = {
-  debug(message?: any, extra?: Record<string, any>): void
-  info(message?: any, extra?: Record<string, any>): void
-  error(message?: any, extra?: Record<string, any>): void
-  warn(message?: any, extra?: Record<string, any>): void
+  debug(message?: unknown, extra?: LogExtra): void
+  info(message?: unknown, extra?: LogExtra): void
+  error(message?: unknown, extra?: LogExtra): void
+  warn(message?: unknown, extra?: LogExtra): void
   tag(key: string, value: string): Logger
   clone(): Logger
   time(
     message: string,
-    extra?: Record<string, any>,
+    extra?: LogExtra,
   ): {
     stop(): void
     [Symbol.dispose](): void
@@ -47,15 +50,21 @@ let logpath = ""
 export function file() {
   return logpath
 }
-let write = (msg: any) => {
+let write = (msg: string) => {
   process.stderr.write(msg)
-  return msg.length
 }
 
 export async function init(options: LogOptions) {
   if (options.level) level = options.level
-  cleanup(Global.Path.log)
-  if (options.print) return
+  void cleanup(Global.Path.log)
+  if (options.print) {
+    logpath = ""
+    write = (msg: string) => {
+      process.stderr.write(msg)
+    }
+    return
+  }
+
   logpath = path.join(
     Global.Path.log,
     options.dev ? "dev.log" : new Date().toISOString().split(".")[0].replace(/:/g, "") + ".log",
@@ -63,10 +72,9 @@ export async function init(options: LogOptions) {
   const logfile = Bun.file(logpath)
   await fs.truncate(logpath).catch(() => { })
   const writer = logfile.writer()
-  write = async (msg: any) => {
-    const num = writer.write(msg)
+  write = (msg: string) => {
+    writer.write(msg)
     writer.flush()
-    return num
   }
 }
 
@@ -78,9 +86,11 @@ async function cleanup(dir: string) {
       absolute: true,
     }),
   )
-  if (files.length <= 5) return
+  if (files.length <= KEEP_LOG_FILES) return
 
-  const filesToDelete = files.slice(0, -10)
+  const filesToDelete = [...files]
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, files.length - KEEP_LOG_FILES)
   await Promise.all(filesToDelete.map((file) => fs.unlink(file).catch(() => { })))
 }
 
@@ -91,8 +101,20 @@ function formatError(error: Error, depth = 0): string {
     : result
 }
 
+function formatValue(value: unknown): string {
+  if (value instanceof Error) return formatError(value)
+  if (typeof value === "object" && value !== null) {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return "[unserializable]"
+    }
+  }
+  return String(value)
+}
+
 let last = Date.now()
-export function create(tags?: Record<string, any>) {
+export function create(tags?: LogExtra) {
   tags = tags || {}
 
   const service = tags["service"]
@@ -103,41 +125,41 @@ export function create(tags?: Record<string, any>) {
     }
   }
 
-  function build(message: any, extra?: Record<string, any>) {
+  function build(message: unknown, extra?: LogExtra) {
     const prefix = Object.entries({
       ...tags,
       ...extra,
     })
       .filter(([_, value]) => value !== undefined && value !== null)
       .map(([key, value]) => {
-        const prefix = `${key}=`
-        if (value instanceof Error) return prefix + formatError(value)
-        if (typeof value === "object") return prefix + JSON.stringify(value)
-        return prefix + value
+        return `${key}=${formatValue(value)}`
       })
       .join(" ")
     const next = new Date()
     const diff = next.getTime() - last
     last = next.getTime()
-    return [next.toISOString().split(".")[0], "+" + diff + "ms", prefix, message].filter(Boolean).join(" ") + "\n"
+    const output = message === undefined || message === null ? "" : formatValue(message)
+    return [next.toISOString().split(".")[0], "+" + diff + "ms", prefix, output]
+      .filter((part) => part.length > 0)
+      .join(" ") + "\n"
   }
   const result: Logger = {
-    debug(message?: any, extra?: Record<string, any>) {
+    debug(message?: unknown, extra?: LogExtra) {
       if (shouldLog("DEBUG")) {
         write("DEBUG " + build(message, extra))
       }
     },
-    info(message?: any, extra?: Record<string, any>) {
+    info(message?: unknown, extra?: LogExtra) {
       if (shouldLog("INFO")) {
         write("INFO  " + build(message, extra))
       }
     },
-    error(message?: any, extra?: Record<string, any>) {
+    error(message?: unknown, extra?: LogExtra) {
       if (shouldLog("ERROR")) {
         write("ERROR " + build(message, extra))
       }
     },
-    warn(message?: any, extra?: Record<string, any>) {
+    warn(message?: unknown, extra?: LogExtra) {
       if (shouldLog("WARN")) {
         write("WARN  " + build(message, extra))
       }
@@ -149,7 +171,7 @@ export function create(tags?: Record<string, any>) {
     clone() {
       return create({ ...tags })
     },
-    time(message: string, extra?: Record<string, any>) {
+    time(message: string, extra?: LogExtra) {
       const now = Date.now()
       result.info(message, { status: "started", ...extra })
       function stop() {

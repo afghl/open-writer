@@ -3,7 +3,7 @@ import path from "node:path"
 import { agentRegistry } from "@/agent"
 import type { ProjectInfo } from "@/project"
 import type { TaskInfo } from "@/task"
-import { projectWorkspaceRoot } from "@/path"
+import { projectWorkspaceRoot } from "@/util/workspace-path"
 import { parseHandoffTaskInput, type HandoffTaskInput } from "./types"
 
 export type HandoffValidation = {

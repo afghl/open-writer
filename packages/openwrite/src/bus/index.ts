@@ -1,6 +1,6 @@
 import z from "zod"
 import { ctx } from "@/context"
-import { Log } from "@/util"
+import { Log } from "@/util/log"
 import * as BusEvent from "./event"
 
 const log = Log.create({ service: "bus" })

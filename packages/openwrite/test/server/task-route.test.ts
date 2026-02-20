@@ -23,7 +23,7 @@ afterAll(async () => {
 async function setupProject() {
   const { Project } = await import("../../src/project")
   const { Session } = await import("../../src/session")
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
 
   const project = await Project.create({
     title: "Task route project",

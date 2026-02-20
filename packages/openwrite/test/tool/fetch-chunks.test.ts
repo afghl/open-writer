@@ -31,7 +31,7 @@ afterAll(async () => {
 })
 
 test("fetch_chunks returns requested chunks and preserves order", async () => {
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { SearchCandidatesTool } = await import("../../src/tool/search-candidates")
   const { FetchChunksTool } = await import("../../src/tool/fetch-chunks")
   const { resetSearchCache } = await import("../../src/search/cache")

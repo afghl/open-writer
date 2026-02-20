@@ -22,7 +22,7 @@ test("handoff_to_writer tool creates handoff task for plan agent", async () => {
   const { Session } = await import("../../src/session")
   const { TaskService } = await import("../../src/task/service")
   const { HandoffToWriterTool } = await import("../../src/tool/handoff-to-writer")
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
 
   const project = await Project.create({
     curr_agent_name: "plan",

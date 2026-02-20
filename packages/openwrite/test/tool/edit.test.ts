@@ -28,7 +28,7 @@ afterAll(async () => {
 test("edit tool publishes fs.updated after successful write", async () => {
   publishCalls.length = 0
 
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { EditTool } = await import("../../src/tool/edit")
 
   const root = projectWorkspaceRoot(projectID)

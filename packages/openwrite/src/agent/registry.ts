@@ -5,7 +5,7 @@ import { PlanAgent } from "./plan"
 import { SearchAgent } from "./search"
 import { WriterAgent } from "./writer"
 import type { Agent } from "./types"
-import { Log } from "@/util"
+import { Log } from "@/util/log"
 
 export class AgentRegistry {
   private agents = new Map<string, Agent>()

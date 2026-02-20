@@ -3,7 +3,8 @@ import path from "node:path"
 import { createHash } from "node:crypto"
 import { Storage } from "@/storage"
 import { Identifier } from "@/id"
-import { resolveWorkspacePath } from "@/path"
+import { openwriteDataDir } from "@/util/data-dir"
+import { logicalWorkspacePath, resolveWorkspacePath } from "@/util/workspace-path"
 import { publishInProject } from "@/bus"
 import { fsCreated, fsUpdated } from "@/bus"
 import { chunkText, embedChunks } from "./etl"
@@ -25,30 +26,26 @@ import {
 const DEFAULT_IMPORT_MAX_PDF_MB = 4
 const DEFAULT_IMPORT_MAX_TXT_MB = 4
 
-function dataDir() {
-  return process.env.OW_DATA_DIR ?? path.join(process.cwd(), ".openwrite")
-}
-
 const pinecone = new PineconeService()
 
 function docsRootLogical(projectID: string) {
-  return `projects/${projectID}/workspace/inputs/library/docs`
+  return logicalWorkspacePath(projectID, "inputs/library/docs")
 }
 
 function summaryRootLogical(projectID: string) {
-  return `projects/${projectID}/workspace/inputs/library/docs/summary`
+  return logicalWorkspacePath(projectID, "inputs/library/docs/summary")
 }
 
 function summaryIndexLogical(projectID: string) {
-  return `projects/${projectID}/workspace/inputs/library/docs/summary/index.md`
+  return logicalWorkspacePath(projectID, "inputs/library/docs/summary/index.md")
 }
 
 function oldSummaryRootLogical(projectID: string) {
-  return `projects/${projectID}/workspace/inputs/library/summary/docs`
+  return logicalWorkspacePath(projectID, "inputs/library/summary/docs")
 }
 
 function oldSummaryIndexLogical(projectID: string) {
-  return `projects/${projectID}/workspace/inputs/library/summary/index.md`
+  return logicalWorkspacePath(projectID, "inputs/library/summary/index.md")
 }
 
 function readIntEnv(name: string, fallback: number) {
@@ -67,7 +64,7 @@ function importMaxBytesForExt(ext: LibraryFileExt) {
 }
 
 function getPayloadPath(projectID: string, importID: string, ext: LibraryFileExt) {
-  return path.join(dataDir(), "library_import_payload", projectID, `${importID}.${ext}`)
+  return path.join(openwriteDataDir(), "library_import_payload", projectID, `${importID}.${ext}`)
 }
 
 function buildDocID(importID: string, title: string) {
@@ -392,7 +389,7 @@ export async function getDoc(projectID: string, docID: string) {
 
 export async function listPendingImports() {
   const all: LibraryImportInfoType[] = []
-  const root = path.join(dataDir(), "library_import")
+  const root = path.join(openwriteDataDir(), "library_import")
   const projectDirs = await fs.readdir(root, { withFileTypes: true }).catch(() => [])
 
     for (const projectEntry of projectDirs) {

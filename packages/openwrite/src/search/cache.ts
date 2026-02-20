@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
-import { rootHolder } from "@/global"
-import { projectWorkspaceRoot, resolveWorkspacePath } from "@/path"
+import { toPosixPath, trimPosixSlashes } from "@/util/path-format"
+import { logicalWorkspacePath, resolveWorkspacePath } from "@/util/workspace-path"
 import { BM25Index } from "./bm25"
 import { chunkDocument } from "./chunker"
 import { rrfFuse } from "./fusion"
@@ -42,12 +42,8 @@ type CorpusIndex = {
 
 const cache = new Map<string, CorpusIndex>()
 
-function normalizePosix(input: string) {
-  return input.replace(/\\/g, "/")
-}
-
 function normalizeScopePath(input: string) {
-  const normalized = normalizePosix(input).replace(/^\/+/, "").replace(/\/+$/, "")
+  const normalized = trimPosixSlashes(input)
   if (!normalized) {
     throw new Error("Scope path cannot be empty")
   }
@@ -115,18 +111,17 @@ function isLikelyBinary(content: Buffer) {
 }
 
 async function listLibraryFiles(projectID: string) {
-  const logical = `${rootHolder}/${LIBRARY_ROOT}`
-  const { resolvedPath } = resolveWorkspacePath(logical, projectID)
+  const logical = logicalWorkspacePath(projectID, LIBRARY_ROOT)
+  const { resolvedPath, workspaceRoot } = resolveWorkspacePath(logical, projectID)
 
   const entries = await walkFiles(resolvedPath)
-  const workspaceRoot = projectWorkspaceRoot(projectID)
 
   const result: FileEntry[] = []
   for (const resolvedPath of entries) {
     const stat = await fs.stat(resolvedPath).catch(() => undefined)
     if (!stat || !stat.isFile()) continue
 
-    const relative = normalizePosix(path.relative(workspaceRoot, resolvedPath))
+    const relative = toPosixPath(path.relative(workspaceRoot, resolvedPath))
     if (!(relative === LIBRARY_ROOT || relative.startsWith(`${LIBRARY_ROOT}/`))) {
       continue
     }

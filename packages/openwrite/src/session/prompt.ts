@@ -9,7 +9,7 @@ import { ToolRegistry } from "@/tool"
 import { SessionProcessor } from "./processor"
 import { LLM } from "./llm"
 import { agentRegistry } from "@/agent"
-import { Log } from "@/util"
+import { Log } from "@/util/log"
 import type { AssistantMessage, MessageTextPart, MessageWithParts, UserMessage } from "./message"
 
 const MAX_STEPS = 8
