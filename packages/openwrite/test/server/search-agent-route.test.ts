@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, expect, test } from "bun:test"
+import { afterAll, beforeAll, expect, mock, test } from "bun:test"
 import { Hono } from "hono"
 import { mkdtemp, rm } from "node:fs/promises"
 import os from "node:os"
@@ -6,6 +6,28 @@ import path from "node:path"
 
 let namespaceRoot = ""
 let projectID = ""
+const runCalls: Array<{ projectID: string; query: string; queryContext: string }> = []
+
+mock.module("@/tool/agentic-search", () => ({
+  AGENTIC_SEARCH_TOOL_ID: "agentic_search",
+  AgenticSearchTool: {},
+  async runAgenticSearch(input: { projectID: string; query: string; queryContext: string }) {
+    runCalls.push(input)
+    return {
+      report_path: "spec/research/search-reports/latest.md",
+      assistant_text: "REPORT_PATH: spec/research/search-reports/latest.md",
+      sub_session_id: "session_search_stub",
+      assistant_message_id: "message_assistant_search_stub",
+      message: {
+        info: {
+          id: "message_assistant_search_stub",
+          role: "assistant",
+        },
+        parts: [],
+      },
+    }
+  },
+}))
 
 beforeAll(async () => {
   namespaceRoot = await mkdtemp(path.join(os.tmpdir(), "openwrite-search-route-"))
@@ -28,18 +50,19 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  mock.restore()
   if (namespaceRoot) {
     await rm(namespaceRoot, { recursive: true, force: true })
   }
 })
 
-test("search-agent route is temporarily disabled", async () => {
+test("agentic-search route runs subagent and returns report metadata", async () => {
   const { setupRoutes } = await import("../../src/server/route")
 
   const app = new Hono()
   setupRoutes(app)
 
-  const response = await app.request("http://localhost/api/search-agent/thread", {
+  const response = await app.request("http://localhost/api/agentic-search", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -52,13 +75,20 @@ test("search-agent route is temporarily disabled", async () => {
     }),
   })
 
-  expect(response.status).toBe(501)
+  expect(response.status).toBe(200)
   const payload = await response.json() as {
-    error: string
-    query: string
-    query_context: string
+    report_path?: string
+    sub_session_id: string
+    assistant_message_id: string
+    assistant_text: string
   }
-  expect(payload.error).toContain("temporarily disabled")
-  expect(payload.query).toBe("how to design search")
-  expect(payload.query_context).toBe("extra context")
+  expect(payload.report_path).toBe("spec/research/search-reports/latest.md")
+  expect(payload.sub_session_id).toBe("session_search_stub")
+  expect(payload.assistant_message_id).toBe("message_assistant_search_stub")
+  expect(payload.assistant_text).toContain("REPORT_PATH:")
+  expect(runCalls[0]).toEqual({
+    projectID,
+    query: "how to design search",
+    queryContext: "extra context",
+  })
 })

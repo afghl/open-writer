@@ -14,6 +14,7 @@ import { TaskRunner, TaskService } from "@/task"
 import { listTree, readFile } from "@/fs"
 import { FsServiceError } from "@/fs"
 import { LibraryImportRunner, LibraryImportService, LibraryServiceError } from "@/library"
+import { runAgenticSearch } from "@/tool/agentic-search"
 import {
   fsCreated,
   fsDeleted,
@@ -47,7 +48,7 @@ const taskCreateInput = z.object({
   }),
   idempotency_key: z.string().min(1).optional(),
 })
-const searchAgentThreadInput = z.object({
+const agenticSearchInput = z.object({
   query: z.string().min(1),
   query_context: z.string().min(1),
 })
@@ -610,13 +611,7 @@ export function setupRoutes(app: Hono) {
     }
   })
 
-  /*
-  app.post("/api/search-agent/thread", async (c) => {
-    // NOTE: This route is temporarily disabled while subagent-as-tool flow is simplified.
-    // The old implementation is intentionally commented out per product decision.
-  })
-  */
-  app.post("/api/search-agent/thread", async (c) => {
+  app.post("/api/agentic-search", async (c) => {
     let body
     try {
       body = await c.req.json()
@@ -624,16 +619,32 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Invalid JSON body" }, 400)
     }
 
-    const parsed = searchAgentThreadInput.safeParse(body)
+    const parsed = agenticSearchInput.safeParse(body)
     if (!parsed.success) {
       return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
     }
 
-    return c.json({
-      error: "search-agent route is temporarily disabled",
-      query: parsed.data.query,
-      query_context: parsed.data.query_context,
-    }, 501)
+    const projectID = ctx()?.project_id ?? ""
+    if (!projectID) {
+      return c.json({ error: "Project ID is required" }, 400)
+    }
+
+    try {
+      const result = await runAgenticSearch({
+        projectID,
+        query: parsed.data.query,
+        queryContext: parsed.data.query_context,
+      })
+      return c.json({
+        ...(result.report_path ? { report_path: result.report_path } : {}),
+        sub_session_id: result.sub_session_id,
+        assistant_message_id: result.assistant_message_id,
+        assistant_text: result.assistant_text,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error"
+      return c.json({ error: message }, 500)
+    }
   })
 
   app.post("/api/message", async (c) => {
