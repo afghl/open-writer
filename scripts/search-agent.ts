@@ -153,8 +153,13 @@ if (values.raw) {
 }
 
 type SearchAgentResponse = {
+  run_id?: string
+  status?: string
+  degraded_reason?: string
   session_id?: string
+  sub_session_id?: string
   assistant_message_id?: string
+  report_path?: string
   report_markdown?: string
   tool_trace?: Array<{ tool?: string; status?: string; title?: string }>
 }
@@ -164,8 +169,23 @@ const result = (payload ?? {}) as SearchAgentResponse
 if (result.session_id) {
   console.log(`session_id: ${result.session_id}`)
 }
+if (result.sub_session_id) {
+  console.log(`sub_session_id: ${result.sub_session_id}`)
+}
+if (result.run_id) {
+  console.log(`run_id: ${result.run_id}`)
+}
+if (result.status) {
+  console.log(`status: ${result.status}`)
+}
+if (result.degraded_reason) {
+  console.log(`degraded_reason: ${result.degraded_reason}`)
+}
 if (result.assistant_message_id) {
   console.log(`assistant_message_id: ${result.assistant_message_id}`)
+}
+if (result.report_path) {
+  console.log(`report_path: ${result.report_path}`)
 }
 
 if (Array.isArray(result.tool_trace) && result.tool_trace.length > 0) {

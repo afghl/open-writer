@@ -20,5 +20,16 @@ test("search tools are isolated to search agent", async () => {
     expect(writerTools.some((tool) => tool.id === id)).toBe(false)
   }
 
-  expect(searchTools.map((tool) => tool.id).sort()).toEqual(searchToolIDs.sort())
+  expect(planTools.some((tool) => tool.id === "agentic_search")).toBe(true)
+  expect(generalTools.some((tool) => tool.id === "agentic_search")).toBe(false)
+  expect(writerTools.some((tool) => tool.id === "agentic_search")).toBe(false)
+  expect(searchTools.some((tool) => tool.id === "agentic_search")).toBe(false)
+
+  const ids = searchTools.map((tool) => tool.id)
+  expect(ids).toContain("search_candidates")
+  expect(ids).toContain("fetch_chunks")
+  expect(ids).toContain("rerank")
+  expect(ids).toContain("read")
+  expect(ids).toContain("edit")
+  expect(ids).toContain("bash")
 })

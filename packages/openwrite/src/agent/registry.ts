@@ -47,6 +47,15 @@ export class AgentRegistry {
     }
     return fallback
   }
+
+  resolveStrict(id: string): Agent {
+    Log.Default.info("Resolving agent strictly", { id })
+    const match = this.get(id)
+    if (!match) {
+      throw new Error(`Agent not found: ${id}`)
+    }
+    return match
+  }
 }
 
 const agentRegistry = new AgentRegistry()

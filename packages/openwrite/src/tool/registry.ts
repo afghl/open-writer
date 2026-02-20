@@ -41,6 +41,9 @@ export async function tools(agent?: Agent) {
   const {
     RerankTool,
   } = await import("./rerank")
+  const {
+    AgenticSearchTool,
+  } = await import("./agentic-search")
   const builtins = [
     ReadTool,
     EditTool,
@@ -49,6 +52,7 @@ export async function tools(agent?: Agent) {
     SearchCandidatesTool,
     FetchChunksTool,
     RerankTool,
+    AgenticSearchTool,
   ]
   const filtered = filterTools([...builtins, ...custom.values()], agent)
   const result = await Promise.all(

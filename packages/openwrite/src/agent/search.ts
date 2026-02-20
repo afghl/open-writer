@@ -1,14 +1,23 @@
 import { BaseAgent } from "./types"
 import SYSTEM_PROMPT from "./search.txt"
-import { SEARCH_TOOL_IDS } from "@/tool"
+import { rootHolder } from "@/global"
+import { SEARCH_TOOL_IDS } from "@/tool/search-shared"
+
+const SEARCH_AGENT_TOOL_IDS = [
+  ...Array.from(SEARCH_TOOL_IDS),
+  "read",
+  "edit",
+  "bash",
+] as const
 
 export class SearchAgent extends BaseAgent {
   constructor() {
+    const systemPrompt = SYSTEM_PROMPT.replaceAll("{{WORKSPACE_ROOT}}", rootHolder)
     super({
       id: "search",
       name: "search",
       description: "a retrieval-focused search agent",
-      prompt: SYSTEM_PROMPT,
+      prompt: systemPrompt,
       mode: "subagent",
       hidden: true,
       native: true,
@@ -18,7 +27,7 @@ export class SearchAgent extends BaseAgent {
       },
       steps: 8,
       permission: {
-        allowTools: Array.from(SEARCH_TOOL_IDS),
+        allowTools: Array.from(SEARCH_AGENT_TOOL_IDS),
       },
       options: {},
     })

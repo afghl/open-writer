@@ -30,6 +30,7 @@ export const PromptInput = z.object({
   text: z.string().min(1),
   agent: z.string().optional(),
   skipTitleGeneration: z.boolean().optional(),
+  maxSteps: z.number().int().min(1).optional(),
 })
 export type PromptInput = z.infer<typeof PromptInput>
 
@@ -69,13 +70,14 @@ export async function prompt(input: PromptInput) {
   })
   return loop(message.info.sessionID, message.info.thread_id, {
     skipTitleGeneration: input.skipTitleGeneration ?? false,
+    maxSteps: input.maxSteps,
   })
 }
 
 export async function loop(
   sessionID: string,
   threadID?: string,
-  options?: { skipTitleGeneration?: boolean },
+  options?: { skipTitleGeneration?: boolean; maxSteps?: number },
 ) {
   const abort = start(sessionID)
   if (!abort) {
@@ -131,7 +133,7 @@ export async function loop(
 
       const agent = agentRegistry.resolve(lastUser.info.agent)
       const agentInfo = agent.Info()
-      const maxSteps = agentInfo.steps ?? MAX_STEPS
+      const maxSteps = options?.maxSteps ?? agentInfo.steps ?? MAX_STEPS
       if (step >= maxSteps) {
         Log.Default.warn("Max steps reached in session loop", { sessionID, step })
         break

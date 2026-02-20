@@ -47,15 +47,9 @@ const taskCreateInput = z.object({
   }),
   idempotency_key: z.string().min(1).optional(),
 })
-const searchScopeInput = z.object({
-  paths: z.array(z.string().min(1)).optional(),
-  extensions: z.array(z.string().min(1)).optional(),
-})
 const searchAgentThreadInput = z.object({
   query: z.string().min(1),
-  scope: searchScopeInput.optional(),
-  k: z.coerce.number().int().min(1).max(50).optional(),
-  max_steps: z.coerce.number().int().min(1).max(20).optional(),
+  query_context: z.string().min(1),
 })
 
 const PROJECT_ID_HEADER = "x-project-id"
@@ -616,6 +610,12 @@ export function setupRoutes(app: Hono) {
     }
   })
 
+  /*
+  app.post("/api/search-agent/thread", async (c) => {
+    // NOTE: This route is temporarily disabled while subagent-as-tool flow is simplified.
+    // The old implementation is intentionally commented out per product decision.
+  })
+  */
   app.post("/api/search-agent/thread", async (c) => {
     let body
     try {
@@ -629,81 +629,11 @@ export function setupRoutes(app: Hono) {
       return c.json({ error: "Invalid request", issues: parsed.error.issues }, 400)
     }
 
-    const projectID = ctx()?.project_id ?? ""
-    if (!projectID) {
-      return c.json({ error: "Project ID is required" }, 400)
-    }
-
-    let project: ProjectInfo
-    try {
-      project = await Project.get(projectID)
-    } catch (error) {
-      if (isNotFoundError(error)) {
-        return c.json({ error: `Project ${projectID} not found` }, 404)
-      }
-      const message = error instanceof Error ? error.message : "Unknown error"
-      return c.json({ error: message }, 500)
-    }
-
-    try {
-      const tempSession = await Session.create({
-        projectID: project.id,
-        title: `Search session - ${new Date().toISOString()}`,
-      })
-      const scope = parsed.data.scope ?? {}
-      const k = parsed.data.k ?? 20
-      const maxSteps = parsed.data.max_steps ?? 6
-      const promptText = [
-        "Run an agentic search task and produce the required markdown report.",
-        `query: ${parsed.data.query}`,
-        `scope: ${JSON.stringify(scope)}`,
-        `k: ${k}`,
-        `max_steps: ${maxSteps}`,
-      ].join("\n")
-
-      const result = await SessionPrompt.prompt({
-        sessionID: tempSession.id,
-        text: promptText,
-        agent: "search",
-        skipTitleGeneration: true,
-      })
-
-      if (result.info.role !== "assistant") {
-        return c.json({ error: "Search agent did not return assistant output" }, 500)
-      }
-
-      const reportMarkdown = result.parts
-        .filter((part): part is MessageTextPart => part.type === "text")
-        .map((part) => part.text)
-        .join("\n")
-        .trim()
-
-      const toolTrace = result.parts
-        .filter((part): part is MessageToolPart => part.type === "tool")
-        .map((part) => ({
-          tool: part.tool,
-          status: part.state.status,
-          title:
-            part.state.status === "completed"
-              ? part.state.title
-              : part.tool,
-          metadata:
-            part.state.status === "completed" || part.state.status === "running" || part.state.status === "error"
-              ? (part.state.metadata ?? {})
-              : {},
-        }))
-
-      return c.json({
-        session_id: tempSession.id,
-        assistant_message_id: result.info.id,
-        report_markdown: reportMarkdown,
-        tool_trace: toolTrace,
-        message: result,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error"
-      return c.json({ error: message }, 500)
-    }
+    return c.json({
+      error: "search-agent route is temporarily disabled",
+      query: parsed.data.query,
+      query_context: parsed.data.query_context,
+    }, 501)
   })
 
   app.post("/api/message", async (c) => {
