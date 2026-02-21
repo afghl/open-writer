@@ -27,7 +27,22 @@ export function resolveLogLevelEnv() {
   return readEnv("OW_LOG_LEVEL")
 }
 
+export function resolvePineconeEnv() {
+  return {
+    apiKey: readEnv("PINECONE_API_KEY"),
+    indexName: readEnv("OW_PINECONE_INDEX"),
+  }
+}
+
+export function validatePineconeEnv() {
+  const config = resolvePineconeEnv()
+  if ((config.apiKey && !config.indexName) || (!config.apiKey && config.indexName)) {
+    throw new Error("PINECONE_API_KEY and OW_PINECONE_INDEX must be configured together")
+  }
+}
+
 export function validateServerEnv() {
   resolveProxyToken()
+  validatePineconeEnv()
   getOpenwriteNamespace()
 }

@@ -8,7 +8,8 @@ const CandidateSchema = z.object({
   chunk_id: z.string().min(1),
   source_path: z.string().min(1),
   snippet: z.string(),
-  fused_score: z.number(),
+  hybrid_score: z.number().optional(),
+  fused_score: z.number().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 })
 
@@ -29,13 +30,20 @@ type Ranked = {
   rank: number
 }
 
+function candidateBaseScore(item: Candidate) {
+  if (typeof item.hybrid_score === "number") {
+    return item.hybrid_score
+  }
+  return item.fused_score ?? 0
+}
+
 function fallbackRanking(candidates: Candidate[], topK: number, reason: string) {
   const fallback = [...candidates]
-    .sort((a, b) => b.fused_score - a.fused_score)
+    .sort((a, b) => candidateBaseScore(b) - candidateBaseScore(a))
     .slice(0, topK)
     .map((item, index) => ({
       chunk_id: item.chunk_id,
-      relevance: Math.max(0, Math.min(1, item.fused_score)),
+      relevance: Math.max(0, Math.min(1, candidateBaseScore(item))),
       reason,
       rank: index + 1,
     }))
@@ -58,7 +66,7 @@ async function rerankByLLM(input: {
       `Candidate ${index + 1}`,
       `chunk_id: ${item.chunk_id}`,
       `source_path: ${item.source_path}`,
-      `fused_score: ${item.fused_score}`,
+      `hybrid_score: ${candidateBaseScore(item)}`,
       `snippet: ${item.snippet}`,
     ].join("\n"))
     .join("\n\n")
@@ -108,7 +116,7 @@ export const RerankTool = Tool.define("rerank", async () => ({
   parameters: z.object({
     query: z.string().min(1).describe("The search query."),
     candidates: z.array(CandidateSchema).min(1)
-      .describe("Candidate chunks from search_candidates."),
+      .describe("Candidate chunks from pinecone_hybrid_search."),
     k: z.number().int().min(1).max(20).optional().describe("Top K results; defaults to min(10, candidate count)."),
   }),
   async execute(params, ctx) {

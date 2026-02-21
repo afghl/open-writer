@@ -46,6 +46,7 @@ export const LibraryDocInfo = z.object({
   source_url: z.string().optional(),
   file_ext: LibraryFileExt,
   doc_path: z.string(),
+  source_text_path: z.string().optional(),
   summary_path: z.string(),
   vector_ids: z.array(z.string()),
   chunk_count: z.number().int().nonnegative(),
@@ -104,6 +105,9 @@ export type ChunkRecord = {
   id: string
   text: string
   index: number
+  offset_start: number
+  text_len: number
+  snippet: string
 }
 
 export type EmbeddingRecord = {
