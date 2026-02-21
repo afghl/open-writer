@@ -117,6 +117,13 @@ function mapFsNode(node: OpenwriteFsNode): FileNode {
     name: node.name,
     type: node.kind === "dir" ? "folder" : "file",
     path: node.path,
+    preview: node.preview
+      ? {
+        kind: node.preview.kind,
+        ...(node.preview.source_type ? { sourceType: node.preview.source_type } : {}),
+        ...(node.preview.source_url ? { sourceURL: node.preview.source_url } : {}),
+      }
+      : undefined,
     children: node.children?.map(mapFsNode),
   };
 }

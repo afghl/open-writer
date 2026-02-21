@@ -148,6 +148,27 @@ export async function relayResponse(upstream: Response) {
   })
 }
 
+export async function relayBinaryResponse(
+  upstream: Response,
+  headerNames: string[] = ["content-type", "content-disposition", "content-length", "cache-control"],
+) {
+  const body = await upstream.arrayBuffer()
+  const headers = new Headers()
+  for (const name of headerNames) {
+    const value = upstream.headers.get(name)
+    if (value) {
+      headers.set(name, value)
+    }
+  }
+  if (!headers.has("content-type")) {
+    headers.set("content-type", "application/octet-stream")
+  }
+  return new Response(body, {
+    status: upstream.status,
+    headers,
+  })
+}
+
 export function proxyErrorResponse(error: unknown) {
   if (error instanceof ProxyConfigError) {
     return Response.json({ error: error.message }, { status: 500 })

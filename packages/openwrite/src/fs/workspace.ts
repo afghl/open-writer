@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 import { resolveWorkspacePath } from "@/path"
-import type { FsNode, FsReadResult } from "./types"
+import type { FsNode, FsRawResult, FsReadResult } from "./types"
 import { FsServiceError } from "./types"
 
 const DEFAULT_TREE_DEPTH = 3
@@ -46,6 +46,14 @@ function toServiceError(error: unknown, inputPath: string) {
     return new FsServiceError("INVALID_PATH", error.message)
   }
   return new FsServiceError("INVALID_PATH", `Invalid path: ${inputPath}`)
+}
+
+function contentTypeForFile(filePath: string) {
+  const ext = path.extname(filePath).toLowerCase()
+  if (ext === ".pdf") {
+    return "application/pdf"
+  }
+  return "application/octet-stream"
 }
 
 function sortNodes(nodes: FsNode[]) {
@@ -121,6 +129,27 @@ export async function readFile(input: {
       truncated: contentResult.truncated || end < lines.length,
       offset,
       limit,
+    }
+  } catch (error) {
+    throw toServiceError(error, input.path)
+  }
+}
+
+export async function readFileRaw(input: {
+  projectID: string
+  path: string
+}): Promise<FsRawResult> {
+  try {
+    const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(input.path, input.projectID)
+    const stat = await fs.stat(resolvedPath)
+    if (!stat.isFile()) {
+      throw new FsServiceError("NOT_FILE", `Path is not a file: ${input.path}`)
+    }
+    return {
+      path: logicalNamespacePath,
+      contentType: contentTypeForFile(resolvedPath),
+      fileName: path.basename(resolvedPath),
+      bytes: await fs.readFile(resolvedPath),
     }
   } catch (error) {
     throw toServiceError(error, input.path)

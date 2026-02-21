@@ -59,6 +59,25 @@ test("readFile supports offset and limit", async () => {
   expect(result.truncated).toBe(true)
 })
 
+test("readFileRaw returns binary payload metadata", async () => {
+  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { readFileRaw } = await import("../../src/fs/workspace")
+
+  const root = projectWorkspaceRoot(projectID)
+  await mkdir(root, { recursive: true })
+  await writeFile(path.join(root, "sample.pdf"), "%PDF-1.4\n", "utf8")
+
+  const result = await readFileRaw({
+    projectID,
+    path: `projects/${projectID}/workspace/sample.pdf`,
+  })
+
+  expect(result.path).toBe(`projects/${projectID}/workspace/sample.pdf`)
+  expect(result.contentType).toBe("application/pdf")
+  expect(result.fileName).toBe("sample.pdf")
+  expect(result.bytes.toString("utf8")).toContain("%PDF-1.4")
+})
+
 test("readFile rejects workspace escape path", async () => {
   const { readFile } = await import("../../src/fs/workspace")
 

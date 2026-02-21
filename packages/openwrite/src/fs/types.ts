@@ -1,4 +1,11 @@
 export type FsNodeKind = "file" | "dir"
+export type FsPreviewKind = "text" | "youtube" | "pdf"
+
+export type FsNodePreview = {
+  kind: FsPreviewKind
+  source_type?: "file" | "youtube"
+  source_url?: string
+}
 
 export type FsNode = {
   name: string
@@ -6,6 +13,7 @@ export type FsNode = {
   kind: FsNodeKind
   size: number
   mtimeMs: number
+  preview?: FsNodePreview
   children?: FsNode[]
 }
 
@@ -16,6 +24,13 @@ export type FsReadResult = {
   truncated: boolean
   offset: number
   limit: number
+}
+
+export type FsRawResult = {
+  path: string
+  contentType: string
+  fileName: string
+  bytes: Buffer
 }
 
 export class FsServiceError extends Error {

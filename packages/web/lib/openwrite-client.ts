@@ -19,7 +19,16 @@ export type OpenwriteFsNode = {
   kind: "file" | "dir"
   size: number
   mtimeMs: number
+  preview?: OpenwriteFsNodePreview
   children?: OpenwriteFsNode[]
+}
+
+export type OpenwriteFsPreviewKind = "text" | "youtube" | "pdf"
+
+export type OpenwriteFsNodePreview = {
+  kind: OpenwriteFsPreviewKind
+  source_type?: "file" | "youtube"
+  source_url?: string
 }
 
 export type OpenwriteFsReadResult = {
@@ -326,6 +335,28 @@ export async function fetchFileContent(input: {
     },
   })
   return payload
+}
+
+export async function fetchFileBlob(input: {
+  projectID: string
+  path: string
+  signal?: AbortSignal
+}) {
+  const params = new URLSearchParams({ path: input.path })
+  const response = await fetch(`/api/openwrite/fs/raw?${params.toString()}`, {
+    method: "GET",
+    cache: "no-store",
+    signal: input.signal,
+    headers: {
+      "x-project-id": input.projectID,
+    },
+  })
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as RequestJSONError | null
+    const message = payload?.error?.trim() || `HTTP ${response.status}`
+    throw new Error(message)
+  }
+  return response.blob()
 }
 
 export async function listLibraryDocs(input: {

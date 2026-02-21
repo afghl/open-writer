@@ -1,3 +1,5 @@
-export { listTree, readFile } from "./workspace"
+export { listTree, readFile, readFileRaw } from "./workspace"
+export { annotateTreePreviewFromDocs, previewForFilePath } from "./preview"
 export { FsServiceError } from "./types"
-export type { FsNode, FsReadResult } from "./types"
+export type { FsNode, FsNodePreview, FsPreviewKind, FsRawResult, FsReadResult } from "./types"
+export type { FsPreviewDocInput } from "./preview"

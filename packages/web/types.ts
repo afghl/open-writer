@@ -7,6 +7,11 @@ export type FileNode = {
   name: string;
   type: FileType;
   path: string;
+  preview?: {
+    kind: "text" | "youtube" | "pdf";
+    sourceType?: "file" | "youtube";
+    sourceURL?: string;
+  };
   children?: FileNode[];
 };
 export type FileContent = { path: string; content: string; updatedAt: string };
