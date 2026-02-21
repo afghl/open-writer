@@ -4,7 +4,7 @@ import path from "node:path"
 import { createTwoFilesPatch, diffLines } from "diff"
 import { Tool, type ToolContext } from "./tool"
 import DESCRIPTION from "./edit.txt"
-import { resolveWorkspacePath } from "@/path"
+import { resolveWorkspacePath } from "@/util/workspace-path"
 import { publish } from "@/bus"
 import { fsUpdated } from "@/bus"
 

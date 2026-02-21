@@ -4,7 +4,7 @@ import type { Agent } from "@/agent"
 import type { MessageWithParts, UserMessage } from "./message"
 import type { ToolContext, ToolInfo } from "@/tool"
 import { Permission } from "@/permission"
-import { Log } from "@/util"
+import { Log } from "@/util/log"
 import { LLM as SharedLLM } from "@/llm"
 
 export type LLMStreamInput = {

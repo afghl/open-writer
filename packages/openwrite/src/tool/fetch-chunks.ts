@@ -3,9 +3,9 @@ import { Tool } from "./tool"
 import { fetchChunks } from "@/search"
 
 const DESCRIPTION =
-  "Fetch full chunk text and metadata by chunk IDs for evidence verification."
+  "Resolve chunk evidence text by chunk IDs using canonical source text spans."
 
-export const FetchChunksTool = Tool.define("fetch_chunks", async () => ({
+export const ResolveChunkEvidenceTool = Tool.define("resolve_chunk_evidence", async () => ({
   description: DESCRIPTION,
   parameters: z.object({
     chunk_ids: z.array(z.string().min(1)).min(1).max(100)
@@ -17,7 +17,7 @@ export const FetchChunksTool = Tool.define("fetch_chunks", async () => ({
       patterns: ["inputs/library/**"],
       always: ["*"],
       metadata: {
-        tool: "fetch_chunks",
+        tool: "resolve_chunk_evidence",
         chunkCount: params.chunk_ids.length,
       },
     })
@@ -28,7 +28,7 @@ export const FetchChunksTool = Tool.define("fetch_chunks", async () => ({
     })
 
     return {
-      title: `fetch_chunks (${result.chunks.length})`,
+      title: `resolve_chunk_evidence (${result.chunks.length})`,
       metadata: {
         requested: params.chunk_ids.length,
         returned: result.chunks.length,

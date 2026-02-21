@@ -1,5 +1,5 @@
 import { Session } from "@/session"
-import { Log } from "@/util"
+import { Log } from "@/util/log"
 import { TaskRegistry } from "./registry"
 import { TaskService } from "./service"
 import type { TaskInfo } from "./types"

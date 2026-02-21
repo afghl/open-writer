@@ -23,7 +23,7 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ["@/*/*", "!@/*/index"],
+              group: ["@/*/*", "!@/*/index", "!@/util/*", "!@/util/**"],
               message: "Import from module index only (e.g. '@/session').",
             },
           ],

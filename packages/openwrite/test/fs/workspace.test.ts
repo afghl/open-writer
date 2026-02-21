@@ -18,7 +18,7 @@ afterAll(async () => {
 })
 
 test("listTree returns directory-first sorted nodes", async () => {
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { listTree } = await import("../../src/fs/workspace")
 
   const root = projectWorkspaceRoot(projectID)
@@ -39,7 +39,7 @@ test("listTree returns directory-first sorted nodes", async () => {
 })
 
 test("readFile supports offset and limit", async () => {
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { readFile } = await import("../../src/fs/workspace")
 
   const root = projectWorkspaceRoot(projectID)

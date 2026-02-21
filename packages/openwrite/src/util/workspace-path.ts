@@ -1,9 +1,10 @@
 import path from "node:path"
 import { getOpenwriteNamespace, rootHolder } from "@/global"
+import { isWithinPath, toPosixPath, trimLeadingSeparators, trimPosixSlashes } from "./path-format"
 
 const pathSep = path.sep
 
-const trimLeadingSeparators = (input: string) => input.replace(/^[/\\]+/, "")
+const escapeRegex = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
 const ensureProjectID = (projectID: string) => {
   if (!projectID) {
@@ -14,14 +15,6 @@ const ensureProjectID = (projectID: string) => {
   }
 }
 
-const isWithin = (base: string, target: string) => {
-  const relative = path.relative(base, target)
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative))
-}
-
-const normalizeToPosix = (input: string) => input.replace(/\\/g, "/")
-const escapeRegex = (input: string) => input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
 function replaceWorkspacePrefixWithBoundary(input: string, prefix: string, replacement: string) {
   const escaped = escapeRegex(prefix)
   const re = new RegExp(`(^|[\\s"'\\\`),;:&|])${escaped}(?=\\/|$|[\\s"'\\\`),;:&|])`, "g")
@@ -29,9 +22,9 @@ function replaceWorkspacePrefixWithBoundary(input: string, prefix: string, repla
 }
 
 function modelPathToProjectRelative(inputPath: string, projectID: string) {
-  const namespacePrefix = `projects/${projectID}/workspace`
-  const normalized = normalizeToPosix(inputPath)
-  const modelPrefix = normalizeToPosix(rootHolder)
+  const namespacePrefix = logicalWorkspaceRoot(projectID)
+  const normalized = toPosixPath(inputPath)
+  const modelPrefix = toPosixPath(rootHolder)
   const withLeadingNamespace = `/${namespacePrefix}`
 
   if (normalized === modelPrefix || normalized === namespacePrefix || normalized === withLeadingNamespace) {
@@ -55,6 +48,17 @@ export function projectWorkspaceRoot(projectID: string) {
   return path.join(namespace, "projects", projectID, "workspace")
 }
 
+export function logicalWorkspaceRoot(projectID: string) {
+  ensureProjectID(projectID)
+  return `projects/${projectID}/workspace`
+}
+
+export function logicalWorkspacePath(projectID: string, relativePath: string) {
+  const root = logicalWorkspaceRoot(projectID)
+  const trimmed = trimPosixSlashes(relativePath)
+  return trimmed ? `${root}/${trimmed}` : root
+}
+
 export function resolveWorkspacePath(inputPath: string, projectID: string) {
   ensureProjectID(projectID)
   const workspaceRoot = projectWorkspaceRoot(projectID)
@@ -73,14 +77,14 @@ export function resolveWorkspacePath(inputPath: string, projectID: string) {
   const resolvedPath = path.normalize(
     path.isAbsolute(candidate) ? candidate : path.join(workspaceRoot, candidate),
   )
-  if (!isWithin(workspaceRoot, resolvedPath)) {
+  if (!isWithinPath(workspaceRoot, resolvedPath)) {
     throw new Error(`Path escapes project workspace: ${inputPath}`)
   }
 
   const relativePath = path.relative(workspaceRoot, resolvedPath)
   const logicalNamespacePath = relativePath
-    ? `projects/${projectID}/workspace/${normalizeToPosix(relativePath)}`
-    : `projects/${projectID}/workspace`
+    ? logicalWorkspacePath(projectID, toPosixPath(relativePath))
+    : logicalWorkspaceRoot(projectID)
 
   return {
     resolvedPath,
@@ -97,18 +101,14 @@ export function resolveWorkspaceDir(inputDir: string | undefined, projectID: str
 export function rewriteCommandWorkspacePaths(command: string, projectID: string) {
   ensureProjectID(projectID)
   const workspaceRoot = projectWorkspaceRoot(projectID)
-  const logicalRoot = `projects/${projectID}/workspace`
+  const logicalRoot = logicalWorkspaceRoot(projectID)
   const withAbsoluteLogicalRoot = replaceWorkspacePrefixWithBoundary(command, `/${logicalRoot}`, workspaceRoot)
   const withRelativeLogicalRoot = replaceWorkspacePrefixWithBoundary(withAbsoluteLogicalRoot, logicalRoot, workspaceRoot)
   return replaceWorkspacePrefixWithBoundary(withRelativeLogicalRoot, rootHolder, workspaceRoot)
-}
-
-export function logicalWorkspaceRoot(projectID: string) {
-  ensureProjectID(projectID)
-  return `projects/${projectID}/workspace`
 }
 
 export function normalizeShellPath(value: string) {
   if (!value) return value
   return value.split(pathSep).join("/")
 }
+

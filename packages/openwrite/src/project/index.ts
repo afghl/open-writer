@@ -1,9 +1,8 @@
 import { z } from "zod"
 import { promises as fs } from "node:fs"
-import { rootHolder } from "@/global"
 import { Identifier } from "@/id"
 import { Storage } from "@/storage"
-import { resolveWorkspacePath } from "@/path"
+import { logicalWorkspacePath, resolveWorkspacePath } from "@/util/workspace-path"
 
 const PROJECT_INIT_DIRS = [
   "inputs/library/docs",
@@ -16,7 +15,7 @@ const PROJECT_INIT_DIRS = [
 
 async function initializeProjectWorkspace(projectID: string) {
   for (const dir of PROJECT_INIT_DIRS) {
-    const logicalPath = `${rootHolder}/${dir}`
+    const logicalPath = logicalWorkspacePath(projectID, dir)
     const { resolvedPath } = resolveWorkspacePath(logicalPath, projectID)
     await fs.mkdir(resolvedPath, { recursive: true })
   }

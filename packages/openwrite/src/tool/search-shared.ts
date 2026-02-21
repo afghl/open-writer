@@ -1,6 +1,6 @@
 export const SEARCH_TOOL_IDS = [
-  "search_candidates",
-  "fetch_chunks",
+  "pinecone_hybrid_search",
+  "resolve_chunk_evidence",
   "rerank",
 ] as const
 

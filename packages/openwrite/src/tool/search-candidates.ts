@@ -3,14 +3,14 @@ import { Tool } from "./tool"
 import { normalizeScope, searchCandidates } from "@/search"
 
 const DESCRIPTION =
-  "Search candidate chunks from inputs/library using BM25 + vector retrieval and return fused ranked candidates."
+  "Search candidate chunks from Pinecone hybrid retrieval and return ranked candidates."
 
 const ScopeSchema = z.object({
   paths: z.array(z.string().min(1)).optional(),
   extensions: z.array(z.string().min(1)).optional(),
 }).optional()
 
-export const SearchCandidatesTool = Tool.define("search_candidates", async () => ({
+export const PineconeHybridSearchTool = Tool.define("pinecone_hybrid_search", async () => ({
   description: DESCRIPTION,
   parameters: z.object({
     query: z.string().min(1).describe("Search query text."),
@@ -25,7 +25,7 @@ export const SearchCandidatesTool = Tool.define("search_candidates", async () =>
       patterns: scope.paths,
       always: ["*"],
       metadata: {
-        tool: "search_candidates",
+        tool: "pinecone_hybrid_search",
         query: params.query,
         scope,
       },
@@ -40,7 +40,7 @@ export const SearchCandidatesTool = Tool.define("search_candidates", async () =>
     })
 
     return {
-      title: `search_candidates (${result.candidates.length})`,
+      title: `pinecone_hybrid_search (${result.candidates.length})`,
       metadata: {
         query: params.query,
         scope,

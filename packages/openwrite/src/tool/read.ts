@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { Tool, type ToolContext } from "./tool"
 import DESCRIPTION from "./read.txt"
-import { resolveWorkspacePath } from "@/path"
+import { resolveWorkspacePath } from "@/util/workspace-path"
 
 const MAX_LINES = 2000
 const MAX_BYTES = 50 * 1024

@@ -20,7 +20,7 @@ afterAll(async () => {
 test("validator accepts locked handoff files", async () => {
   const { Project } = await import("../../src/project")
   const { Session } = await import("../../src/session")
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { HandoffValidator } = await import("../../src/handoff/validator")
 
   const project = await Project.create({
@@ -63,7 +63,7 @@ test("validator accepts locked handoff files", async () => {
 test("validator fails when lock exists but not locked", async () => {
   const { Project } = await import("../../src/project")
   const { Session } = await import("../../src/session")
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { HandoffValidator } = await import("../../src/handoff/validator")
 
   const project = await Project.create({
