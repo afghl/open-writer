@@ -6,9 +6,9 @@ import { Identifier } from "@/id"
 import { resolveWorkspacePath } from "@/path"
 import { publishInProject } from "@/bus"
 import { fsCreated, fsUpdated } from "@/bus"
+import { PineconeService, sparseVectorFromText } from "@/vectorstore"
 import { chunkText, embedChunks } from "./etl"
 import { parseFileBuffer, parseYouTubeTranscript, makeShortHash } from "./parser"
-import { PineconeService } from "./pinecone"
 import { buildSummary, renderSummaryMarkdown, slugifyTitle } from "./summary"
 import {
   LibraryDocInfo,
@@ -37,6 +37,10 @@ function docsRootLogical(projectID: string) {
 
 function summaryRootLogical(projectID: string) {
   return `projects/${projectID}/workspace/inputs/library/docs/summary`
+}
+
+function textRootLogical(projectID: string) {
+  return `projects/${projectID}/workspace/inputs/library/docs/text`
 }
 
 function summaryIndexLogical(projectID: string) {
@@ -235,6 +239,9 @@ function buildSummaryIndexMarkdown(projectID: string, docs: LibraryDocInfo[]) {
     lines.push(`- doc_id: ${doc.id}`)
     lines.push(`- source_type: ${doc.source_type}`)
     lines.push(`- doc_path: ${doc.doc_path}`)
+    if (doc.source_text_path) {
+      lines.push(`- source_text_path: ${doc.source_text_path}`)
+    }
     lines.push(`- summary_path: ${doc.summary_path}`)
     if (doc.source_url) {
       lines.push(`- source_url: ${doc.source_url}`)
@@ -468,6 +475,7 @@ export async function listPendingImports() {
     sourceURL?: string
     fileExt: LibraryFileExt
     docPath: string
+    sourceTextPath: string
     summaryPath: string
     title: string
     titleSlug: string
@@ -486,6 +494,7 @@ export async function listPendingImports() {
       source_url: input.sourceURL,
       file_ext: input.fileExt,
       doc_path: input.docPath,
+      source_text_path: input.sourceTextPath,
       summary_path: input.summaryPath,
       vector_ids: input.vectorIDs,
       chunk_count: input.chunkCount,
@@ -562,6 +571,8 @@ export async function processImport(importTask: LibraryImportInfoType) {
 
       const docID = replaceDoc?.id ?? buildDocID(importID, title)
       const docPath = replaceDoc?.doc_path ?? `${docsRootLogical(projectID)}/${titleSlug}--${docID}.${fileExt}`
+      const sourceTextPath = replaceDoc?.source_text_path
+        ?? `${textRootLogical(projectID)}/${titleSlug}--${docID}.txt`
       const summaryPath = replaceDoc?.summary_path ?? `${summaryRootLogical(projectID)}/${titleSlug}--${docID}.md`
 
       await markStage(projectID, importID, "chunking")
@@ -581,13 +592,19 @@ export async function processImport(importTask: LibraryImportInfoType) {
       await pinecone.upsert(projectID, embeddings.map((embedding, index) => ({
         id: embedding.id,
         values: embedding.values,
+        sparseValues: sparseVectorFromText(chunks[index]?.text ?? ""),
         metadata: {
           project_id: projectID,
           doc_id: docID,
+          chunk_id: embedding.id,
           title,
           source_type: sourceType,
           source_path: docPath,
+          source_text_path: sourceTextPath,
           chunk_index: chunks[index]?.index ?? index,
+          offset_start: chunks[index]?.offset_start ?? 0,
+          text_len: chunks[index]?.text_len ?? 0,
+          snippet: chunks[index]?.snippet ?? "",
           import_id: importID,
           ...(canonicalURL ? { source_url: canonicalURL } : {}),
         },
@@ -605,6 +622,12 @@ export async function processImport(importTask: LibraryImportInfoType) {
         projectID,
         logicalPath: docPath,
         content: rawBytes,
+        source: "external_upload",
+      })
+      await writeWorkspaceFile({
+        projectID,
+        logicalPath: sourceTextPath,
+        content: parsedText,
         source: "external_upload",
       })
 
@@ -630,6 +653,7 @@ export async function processImport(importTask: LibraryImportInfoType) {
         sourceURL: canonicalURL || undefined,
         fileExt,
         docPath,
+        sourceTextPath,
         summaryPath,
         title,
         titleSlug,

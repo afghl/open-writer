@@ -2,15 +2,15 @@ import { createHash } from "node:crypto"
 import { LibraryServiceError, type ChunkRecord, type EmbeddingRecord } from "./types"
 import { LLM } from "@/llm"
 
-const DEFAULT_CHUNK_SIZE = 800
+const DEFAULT_CHUNK_SIZE = 1000
 const DEFAULT_CHUNK_OVERLAP = 120
 
-function tokenize(input: string) {
-  return input
-    .replace(/\s+/g, " ")
-    .trim()
-    .split(" ")
-    .filter((item) => item.length > 0)
+function makeSnippet(input: string) {
+  const flat = input.replace(/\s+/g, " ").trim()
+  if (flat.length <= 220) {
+    return flat
+  }
+  return `${flat.slice(0, 217)}...`
 }
 
 function deterministicVector(input: string, dimensions = 256) {
@@ -30,30 +30,32 @@ export function chunkText(input: {
 }): ChunkRecord[] {
   const chunkSize = Math.max(200, input.chunkSize ?? DEFAULT_CHUNK_SIZE)
   const overlap = Math.max(0, Math.min(chunkSize - 1, input.overlap ?? DEFAULT_CHUNK_OVERLAP))
-
-  const tokens = tokenize(input.text)
-  if (tokens.length === 0) {
+  const source = input.text
+  if (source.trim().length === 0) {
     throw new LibraryServiceError("EMPTY_TEXT", "Parsed text is empty")
   }
 
   const chunks: ChunkRecord[] = []
-  let cursor = 0
+  const step = Math.max(1, chunkSize - overlap)
   let chunkIndex = 0
-  while (cursor < tokens.length) {
-    const slice = tokens.slice(cursor, cursor + chunkSize)
-    const text = slice.join(" ").trim()
-    if (text.length > 0) {
-      chunks.push({
-        id: `${input.docID}::${chunkIndex}`,
-        text,
-        index: chunkIndex,
-      })
-      chunkIndex += 1
-    }
-    if (cursor + chunkSize >= tokens.length) {
+  for (let start = 0; start < source.length; start += step) {
+    const end = Math.min(source.length, start + chunkSize)
+    const text = source.slice(start, end)
+    if (text.length === 0) {
       break
     }
-    cursor += Math.max(1, chunkSize - overlap)
+    chunks.push({
+      id: `${input.docID}::${chunkIndex}`,
+      text,
+      index: chunkIndex,
+      offset_start: start,
+      text_len: text.length,
+      snippet: makeSnippet(text),
+    })
+    chunkIndex += 1
+    if (end >= source.length) {
+      break
+    }
   }
 
   if (chunks.length === 0) {

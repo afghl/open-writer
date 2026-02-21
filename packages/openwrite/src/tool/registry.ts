@@ -33,10 +33,10 @@ export async function tools(agent?: Agent) {
     HandoffToWriterTool,
   } = await import("./handoff-to-writer")
   const {
-    SearchCandidatesTool,
+    PineconeHybridSearchTool,
   } = await import("./search-candidates")
   const {
-    FetchChunksTool,
+    ResolveChunkEvidenceTool,
   } = await import("./fetch-chunks")
   const {
     RerankTool,
@@ -49,8 +49,8 @@ export async function tools(agent?: Agent) {
     EditTool,
     BashTool,
     HandoffToWriterTool,
-    SearchCandidatesTool,
-    FetchChunksTool,
+    PineconeHybridSearchTool,
+    ResolveChunkEvidenceTool,
     RerankTool,
     AgenticSearchTool,
   ]
