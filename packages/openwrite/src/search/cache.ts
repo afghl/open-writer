@@ -2,9 +2,9 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 import { resolveWorkspacePath } from "@/path"
 import { PineconeService, sparseVectorFromText } from "@/vectorstore"
-import { embedTexts } from "./vector"
 import type { SearchChunk, SearchResult, SearchScope, SearchScopeInput } from "./types"
 import { DEFAULT_SCOPE_EXTENSIONS, DEFAULT_SCOPE_PATHS } from "./types"
+import { LLM } from "@/llm"
 
 const pinecone = new PineconeService()
 
@@ -179,6 +179,43 @@ export async function searchCandidates(input: {
       candidate_hits: matches.length,
     },
   }
+}
+
+
+
+export async function embedTexts(input: {
+  texts: string[]
+  signal?: AbortSignal
+}) {
+  const EMBEDDING_BATCH_SIZE = 32
+  if (input.texts.length === 0) {
+    return [] as number[][]
+  }
+
+  const llm = LLM.for("search.embedding")
+  const vectors: number[][] = []
+
+  for (let start = 0; start < input.texts.length; start += EMBEDDING_BATCH_SIZE) {
+    const batch = input.texts.slice(start, start + EMBEDDING_BATCH_SIZE)
+    const result = await llm.embedMany({
+      model: llm.model,
+      values: batch,
+      abortSignal: input.signal,
+    })
+    const data = result.embeddings ?? []
+    if (data.length !== batch.length) {
+      throw new Error("Embedding response size mismatch")
+    }
+
+    for (const embedding of data) {
+      if (!Array.isArray(embedding) || embedding.length === 0) {
+        throw new Error("Invalid embedding vector in response")
+      }
+      vectors.push(embedding)
+    }
+  }
+
+  return vectors
 }
 
 function clipSlice(content: string, start: number, len: number) {
