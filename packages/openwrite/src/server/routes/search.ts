@@ -1,6 +1,6 @@
 import type { Hono } from "hono"
 import { ctx } from "@/context"
-import { runAgenticSearch } from "@/tool/agentic-search"
+import { runAgenticSearch } from "@/tool"
 import { agenticSearchInput } from "../schemas"
 
 export function registerSearchRoutes(app: Hono) {

@@ -10,6 +10,7 @@ const generateTextCalls: Array<Record<string, unknown>> = []
 const generateObjectCalls: Array<Record<string, unknown>> = []
 const streamTextCalls: Array<Record<string, unknown>> = []
 const embedManyCalls: Array<Record<string, unknown>> = []
+const actualAi = await import("ai")
 
 mock.module("@ai-sdk/openai", () => ({
   createOpenAI(config: OpenAIConfigCall) {
@@ -29,6 +30,7 @@ mock.module("@ai-sdk/openai", () => ({
 }))
 
 mock.module("ai", () => ({
+  ...actualAi,
   generateText(input: Record<string, unknown>) {
     generateTextCalls.push(input)
     return Promise.resolve({
@@ -69,6 +71,7 @@ beforeAll(() => {
 })
 
 afterAll(() => {
+  mock.restore()
   if (prevAPIKey === undefined) {
     delete process.env.OPENAI_API_KEY
   } else {

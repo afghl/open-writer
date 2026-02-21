@@ -54,7 +54,7 @@ test("library import API rejects unsupported file extension", async () => {
 
 test("library import API writes canonical source text path", async () => {
   const { setupRoutes } = await import("../../src/server/route")
-  const { resolveWorkspacePath } = await import("../../src/path")
+  const { resolveWorkspacePath } = await import("../../src/util/workspace-path")
   const app = new Hono()
   setupRoutes(app)
 

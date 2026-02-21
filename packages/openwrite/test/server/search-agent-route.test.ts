@@ -7,10 +7,10 @@ import path from "node:path"
 let namespaceRoot = ""
 let projectID = ""
 const runCalls: Array<{ projectID: string; query: string; queryContext: string }> = []
+const actualAgenticSearch = await import("../../src/tool/agentic-search")
 
 mock.module("@/tool/agentic-search", () => ({
-  AGENTIC_SEARCH_TOOL_ID: "agentic_search",
-  AgenticSearchTool: {},
+  ...actualAgenticSearch,
   async runAgenticSearch(input: { projectID: string; query: string; queryContext: string }) {
     runCalls.push(input)
     return {

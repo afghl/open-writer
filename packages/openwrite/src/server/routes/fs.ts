@@ -71,10 +71,14 @@ export function registerFsRoutes(app: Hono) {
         projectID,
         path: parsed.data.path,
       })
-      c.header("content-type", result.contentType)
-      c.header("content-disposition", `inline; filename="${sanitizeDispositionFilename(result.fileName)}"`)
-      c.header("cache-control", "no-store")
-      return c.body(result.bytes)
+      const payload = new Uint8Array(result.bytes.buffer, result.bytes.byteOffset, result.bytes.byteLength)
+      return new Response(payload, {
+        headers: {
+          "content-type": result.contentType,
+          "content-disposition": `inline; filename="${sanitizeDispositionFilename(result.fileName)}"`,
+          "cache-control": "no-store",
+        },
+      })
     } catch (error) {
       return fsErrorResponse(c, error)
     }

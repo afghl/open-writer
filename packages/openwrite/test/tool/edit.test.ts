@@ -20,6 +20,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
+  mock.restore()
   if (namespaceRoot) {
     await rm(namespaceRoot, { recursive: true, force: true })
   }

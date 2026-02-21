@@ -133,7 +133,7 @@ export async function update(projectID: string, editor: (draft: ProjectInfo) => 
       draft.curr_thread_id = draft.root_thread_id
     }
     editor(draft)
-    draft.time.updated = Date.now()
+    draft.time.updated = Math.max(Date.now(), draft.time.updated) + 1
   })
 }
 

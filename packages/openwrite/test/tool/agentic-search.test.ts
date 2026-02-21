@@ -12,6 +12,7 @@ type PromptCall = {
 }
 
 const promptCalls: PromptCall[] = []
+const loadAgenticSearchModule = () => import("../../src/tool/" + "agentic-search?agentic-search-test")
 
 mock.module("@/session/prompt", () => ({
   PromptInput: z.any(),
@@ -76,7 +77,7 @@ afterAll(async () => {
 })
 
 test("agentic_search returns report_path from search-agent output", async () => {
-  const { AgenticSearchTool } = await import("../../src/tool/agentic-search")
+  const { AgenticSearchTool } = await loadAgenticSearchModule()
 
   const tool = await AgenticSearchTool.init()
   const result = await tool.execute(
@@ -113,7 +114,7 @@ test("agentic_search returns report_path from search-agent output", async () => 
 })
 
 test("agentic_search rejects non-plan callers", async () => {
-  const { AgenticSearchTool } = await import("../../src/tool/agentic-search")
+  const { AgenticSearchTool } = await loadAgenticSearchModule()
   const tool = await AgenticSearchTool.init()
 
   await expect(

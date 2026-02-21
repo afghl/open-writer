@@ -60,7 +60,7 @@ test("readFile supports offset and limit", async () => {
 })
 
 test("readFileRaw returns binary payload metadata", async () => {
-  const { projectWorkspaceRoot } = await import("../../src/path/workspace")
+  const { projectWorkspaceRoot } = await import("../../src/util/workspace-path")
   const { readFileRaw } = await import("../../src/fs/workspace")
 
   const root = projectWorkspaceRoot(projectID)

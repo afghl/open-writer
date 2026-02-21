@@ -1,4 +1,4 @@
-import { expect, test, mock } from "bun:test"
+import { afterAll, expect, test, mock } from "bun:test"
 import type { MessageWithParts } from "../../src/session/message"
 
 type ConvertCall = {
@@ -16,6 +16,10 @@ mock.module("ai", () => ({
 }))
 
 const { Message } = await import("../../src/session/message")
+
+afterAll(() => {
+  mock.restore()
+})
 
 const resetCalls = () => {
   convertCalls.length = 0
