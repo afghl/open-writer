@@ -2,6 +2,7 @@ import { BaseAgent } from "./types"
 import SYSTEM_PROMPT from "./search.txt"
 import { rootHolder } from "@/global"
 import { SEARCH_TOOL_IDS } from "@/tool/search-shared"
+import { composeAgentPrompt } from "./prompt-compose"
 
 const SEARCH_AGENT_TOOL_IDS = [
   ...Array.from(SEARCH_TOOL_IDS),
@@ -12,7 +13,7 @@ const SEARCH_AGENT_TOOL_IDS = [
 
 export class SearchAgent extends BaseAgent {
   constructor() {
-    const systemPrompt = SYSTEM_PROMPT.replaceAll("{{WORKSPACE_ROOT}}", rootHolder)
+    const systemPrompt = composeAgentPrompt(SYSTEM_PROMPT)
     super({
       id: "search",
       name: "search",

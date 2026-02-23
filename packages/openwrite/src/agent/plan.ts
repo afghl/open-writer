@@ -1,7 +1,8 @@
 import { BaseAgent, type PermissionRuleset } from "./types"
 import SYSTEM_PROMPT from "./plan.txt"
 import { rootHolder } from "@/global"
-import { SEARCH_TOOL_IDS } from "@/tool/search-shared"
+import { composeAgentPrompt } from "./prompt-compose"
+import { SEARCH_TOOL_IDS } from "../tool/search-shared"
 
 const defaultPermission: PermissionRuleset = {
   denyTools: Array.from(SEARCH_TOOL_IDS),
@@ -9,7 +10,7 @@ const defaultPermission: PermissionRuleset = {
 
 export class PlanAgent extends BaseAgent {
   constructor() {
-    const systemPrompt = SYSTEM_PROMPT.replaceAll("{{WORKSPACE_ROOT}}", rootHolder)
+    const systemPrompt = composeAgentPrompt(SYSTEM_PROMPT)
     super({
       id: "plan",
       name: "plan",
