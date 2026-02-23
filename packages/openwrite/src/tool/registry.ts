@@ -39,9 +39,6 @@ export async function tools(agent?: Agent) {
     ResolveChunkEvidenceTool,
   } = await import("./fetch-chunks")
   const {
-    RerankTool,
-  } = await import("./rerank")
-  const {
     AgenticSearchTool,
   } = await import("./agentic-search")
   const builtins = [
@@ -51,7 +48,6 @@ export async function tools(agent?: Agent) {
     HandoffToWriterTool,
     PineconeHybridSearchTool,
     ResolveChunkEvidenceTool,
-    RerankTool,
     AgenticSearchTool,
   ]
   const filtered = filterTools([...builtins, ...custom.values()], agent)

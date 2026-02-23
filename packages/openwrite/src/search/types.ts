@@ -56,3 +56,28 @@ export type SearchResult = {
   candidates: CandidateChunk[]
   stats: SearchStats
 }
+
+export type RerankedEvidence = {
+  rank: number
+  chunk_id: string
+  source_path: string
+  relevance: number
+  reason: string
+  text: string
+}
+
+export type AtomicSearchStats = {
+  backend: "pinecone_hybrid"
+  candidate_hits: number
+  retrieved_candidates: number
+  resolved_chunks: number
+  fallback: boolean
+}
+
+export type AtomicSearchResult = {
+  query: string
+  scope: SearchScope
+  results: RerankedEvidence[]
+  missing_chunk_ids: string[]
+  stats: AtomicSearchStats
+}

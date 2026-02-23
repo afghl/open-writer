@@ -1,9 +1,12 @@
 import z from "zod"
 import { Tool } from "./tool"
-import { normalizeScope, searchCandidates } from "@/search"
+import { fetchChunks, normalizeScope, rerankEvidence, searchCandidates, type AtomicSearchResult } from "@/search"
 
 const DESCRIPTION =
-  "Search candidate chunks from Pinecone hybrid retrieval and return ranked candidates."
+  "Run atomic hybrid retrieval + evidence resolution + reranking and return final evidence results."
+
+const FIXED_RETRIEVE_K = 15
+const FIXED_TOP_K = 10
 
 const ScopeSchema = z.object({
   paths: z.array(z.string().min(1)).optional(),
@@ -15,7 +18,6 @@ export const PineconeHybridSearchTool = Tool.define("pinecone_hybrid_search", as
   parameters: z.object({
     query: z.string().min(1).describe("Search query text."),
     scope: ScopeSchema.describe("Optional scope (paths/extensions) under inputs/library."),
-    k: z.number().int().min(1).max(50).optional().describe("Max candidates to return, default 20."),
   }),
   async execute(params, ctx) {
     const scope = normalizeScope(params.scope)
@@ -35,18 +37,50 @@ export const PineconeHybridSearchTool = Tool.define("pinecone_hybrid_search", as
       projectID: ctx.projectID,
       query: params.query,
       scope,
-      k: params.k,
+      k: FIXED_RETRIEVE_K,
       signal: ctx.abort,
     })
 
+    const fetchResult = await fetchChunks({
+      projectID: ctx.projectID,
+      chunkIDs: result.candidates.map((item) => item.chunk_id),
+    })
+
+    const rerankResult = await rerankEvidence({
+      query: params.query,
+      candidates: result.candidates,
+      chunks: fetchResult.chunks,
+      topK: FIXED_TOP_K,
+      signal: ctx.abort,
+    })
+
+    const missingChunkIDs = Array.from(new Set([
+      ...fetchResult.missing_chunk_ids,
+      ...rerankResult.missing_chunk_ids,
+    ]))
+
+    const output: AtomicSearchResult = {
+      query: params.query,
+      scope,
+      results: rerankResult.results,
+      missing_chunk_ids: missingChunkIDs,
+      stats: {
+        backend: result.stats.backend,
+        candidate_hits: result.stats.candidate_hits,
+        retrieved_candidates: result.candidates.length,
+        resolved_chunks: fetchResult.chunks.length,
+        fallback: rerankResult.fallback,
+      },
+    }
+
     return {
-      title: `pinecone_hybrid_search (${result.candidates.length})`,
+      title: `pinecone_hybrid_search (${output.results.length})`,
       metadata: {
         query: params.query,
         scope,
-        stats: result.stats,
+        stats: output.stats,
       },
-      output: JSON.stringify(result, null, 2),
+      output: JSON.stringify(output, null, 2),
     }
   },
 }))
