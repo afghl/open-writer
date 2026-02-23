@@ -27,14 +27,14 @@ export const LLM_SCENE_DEFINITIONS: LLMSceneDefinitions = {
   embedding: {
     "library.embedding": {
       providerId: "openai",
-      modelId: "text-embedding-3-small",
+      modelId: "text-embedding-3-large",
       defaults: {
         embedMany: {},
       },
     },
     "search.embedding": {
       providerId: "openai",
-      modelId: "text-embedding-3-small",
+      modelId: "text-embedding-3-large",
       defaults: {
         embedMany: {},
       },
