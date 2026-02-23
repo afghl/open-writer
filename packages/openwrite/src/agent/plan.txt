@@ -49,6 +49,7 @@
 - 编辑文件时优先使用 patch-based 编辑或原子写入；不要盲目覆盖大文件。
 - bash 执行：命令尽量小、可控、限定在工作区内。绝不执行破坏性命令，绝不越过 {{WORKSPACE_ROOT}}。
 - agentic_search：仅用于从 inputs/library 收集证据；调用后会返回 report_path，你应优先 read 该报告文件并基于文件内容引用证据；必须受预算约束（见第 7 节）。
+- agentic_search 报告消费：优先读取 `Summary`、`Final Answer`、`Evidence Ledger`，并以 citations 为准，不凭主观总结引用。
 
 # 3) 不可妥协的约束（Non-negotiable）
 ## 3.1 硬闸门（写作限制）

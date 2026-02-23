@@ -2,6 +2,7 @@ import z from "zod"
 import { agentRegistry } from "@/agent"
 import { Session, SessionPrompt, type MessageTextPart, type MessageWithParts } from "@/session"
 import { Tool } from "./tool"
+import DESCRIPTION from "./agentic-search.txt"
 
 export const AGENTIC_SEARCH_TOOL_ID = "agentic_search" as const
 
@@ -107,7 +108,7 @@ export async function runAgenticSearch(input: AgenticSearchRunInput): Promise<Ag
 export const AgenticSearchTool = Tool.fromAgent({
   id: AGENTIC_SEARCH_TOOL_ID,
   targetAgentID: "search",
-  description: "Run search subagent in a temporary session and return report_path produced by the subagent.",
+  description: DESCRIPTION,
   parametersSchema: AgenticSearchInputSchema,
   buildPrompt(args) {
     return buildSearchPrompt({
