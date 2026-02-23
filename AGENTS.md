@@ -21,7 +21,7 @@
 
 ## Commands
 
-只保留高频入口命令；其余命令一律以 `package.json` scripts 为准。
+这里仅列出入口命令；其余命令一律以 `package.json` scripts 为准。
 
 常用：
 
@@ -71,7 +71,6 @@ bun run ci:check
 - 触达 `packages/web`：至少运行 `bun run typecheck:web`
 - 触达 `packages/tui`：至少运行 `bun run --cwd packages/tui typecheck`
 - 高风险或跨包改动：运行 `bun run ci:check`
-- 改动后说明需包含：改了什么、为什么改、跑了哪些命令
 
 ## Repo Etiquette
 
@@ -93,9 +92,3 @@ bun run ci:check
 - 大多数非项目创建接口还依赖 `x-project-id`
 - `Permission.ask` 当前是 no-op；不要假设已存在真实审批流
 - 不提交任何 `.env` 密钥，不把 secret 写入日志
-
-## Maintenance
-
-- 保持本文件短小（建议 <= 200 行）
-- 命令、路由、检查流程变化时，在同一 PR 更新本文件
-- 最近复核日期：`2026-02-23`
