@@ -1,6 +1,7 @@
 import z from "zod"
 import { agentRegistry } from "@/agent"
 import { Session, SessionPrompt, type MessageTextPart, type MessageWithParts } from "@/session"
+import { resolveUniqueSearchReportPath, searchReportPathPlaceholder } from "@/util/search-report-path"
 import { Tool } from "./tool"
 import DESCRIPTION from "./agentic-search.txt"
 
@@ -28,14 +29,24 @@ export type AgenticSearchRunOutput = {
   message: MessageWithParts
 }
 
+function upsertReportPathInPrompt(promptText: string, reportPath: string) {
+  const lines = promptText
+    .split("\n")
+    .filter((line) => !/^\s*report_path\s*:/i.test(line))
+  lines.push(`report_path: ${reportPath}`)
+  return lines.join("\n")
+}
+
 export function buildSearchPrompt(input: {
   query: string
   queryContext: string
+  reportPath: string
 }) {
   return [
     "Run search and write the report file as required by your system prompt.",
     `query: ${input.query}`,
     `query_context: ${input.queryContext}`,
+    `report_path: ${input.reportPath}`,
   ].join("\n")
 }
 
@@ -77,10 +88,17 @@ export function parseSearchAssistantResult(message: MessageWithParts) {
 export async function runAgenticSearch(input: AgenticSearchRunInput): Promise<AgenticSearchRunOutput> {
   agentRegistry.resolveStrict("search")
 
-  const promptText = input.promptText ?? buildSearchPrompt({
+  const expectedReportPath = await resolveUniqueSearchReportPath({
+    projectID: input.projectID,
+    query: input.query,
+  })
+
+  const basePromptText = input.promptText ?? buildSearchPrompt({
     query: input.query,
     queryContext: input.queryContext,
+    reportPath: expectedReportPath,
   })
+  const promptText = upsertReportPathInPrompt(basePromptText, expectedReportPath)
 
   const tempSession = await Session.create({
     projectID: input.projectID,
@@ -95,9 +113,17 @@ export async function runAgenticSearch(input: AgenticSearchRunInput): Promise<Ag
   })
 
   const parsed = parseSearchAssistantResult(message)
+  if (!parsed.reportPath) {
+    throw new Error("Search subagent did not return REPORT_PATH.")
+  }
+  if (parsed.reportPath !== expectedReportPath) {
+    throw new Error(
+      `Search subagent returned unexpected REPORT_PATH: ${parsed.reportPath}; expected: ${expectedReportPath}`,
+    )
+  }
 
   return {
-    ...(parsed.reportPath ? { report_path: parsed.reportPath } : {}),
+    report_path: expectedReportPath,
     assistant_text: parsed.assistantText,
     sub_session_id: tempSession.id,
     assistant_message_id: message.info.id,
@@ -114,6 +140,7 @@ export const AgenticSearchTool = Tool.fromAgent({
     return buildSearchPrompt({
       query: args.query,
       queryContext: args.query_context,
+      reportPath: searchReportPathPlaceholder(),
     })
   },
   async run(input) {

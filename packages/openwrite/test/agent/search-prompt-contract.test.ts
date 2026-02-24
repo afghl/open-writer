@@ -22,7 +22,8 @@ test("search prompt defines eight report headings in fixed order", () => {
 })
 
 test("search prompt defines strict REPORT_PATH/REPORT_ERROR output contract", () => {
-  expect(SEARCH_SYSTEM_PROMPT).toContain("REPORT_PATH: spec/research/search-reports/latest.md")
+  expect(SEARCH_SYSTEM_PROMPT).toContain("report_path")
+  expect(SEARCH_SYSTEM_PROMPT).toContain("REPORT_PATH: <report_path>")
   expect(SEARCH_SYSTEM_PROMPT).toContain("REPORT_ERROR: <code>: <brief_reason>")
 
   for (const code of [
