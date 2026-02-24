@@ -14,8 +14,8 @@ mock.module("@/tool/agentic-search", () => ({
   async runAgenticSearch(input: { projectID: string; query: string; queryContext: string }) {
     runCalls.push(input)
     return {
-      report_path: "spec/research/search-reports/latest.md",
-      assistant_text: "REPORT_PATH: spec/research/search-reports/latest.md",
+      report_path: "spec/research/search-reports/how-to-design-search.md",
+      assistant_text: "REPORT_PATH: spec/research/search-reports/how-to-design-search.md",
       sub_session_id: "session_search_stub",
       assistant_message_id: "message_assistant_search_stub",
       message: {
@@ -82,7 +82,7 @@ test("agentic-search route runs subagent and returns report metadata", async () 
     assistant_message_id: string
     assistant_text: string
   }
-  expect(payload.report_path).toBe("spec/research/search-reports/latest.md")
+  expect(payload.report_path).toBe("spec/research/search-reports/how-to-design-search.md")
   expect(payload.sub_session_id).toBe("session_search_stub")
   expect(payload.assistant_message_id).toBe("message_assistant_search_stub")
   expect(payload.assistant_text).toContain("REPORT_PATH:")

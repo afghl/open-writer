@@ -1,5 +1,5 @@
-import { afterAll, beforeAll, expect, mock, test } from "bun:test"
-import { mkdtemp, rm } from "node:fs/promises"
+import { afterAll, beforeAll, beforeEach, expect, mock, test } from "bun:test"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import z from "zod"
@@ -13,6 +13,12 @@ type PromptCall = {
 
 const promptCalls: PromptCall[] = []
 const loadAgenticSearchModule = () => import("../../src/tool/" + "agentic-search?agentic-search-test")
+let forcedReportPath: string | undefined
+
+function parseReportPath(text: string) {
+  const match = text.match(/^\s*report_path\s*:\s*(.+)$/im)
+  return match?.[1]?.trim()
+}
 
 mock.module("@/session/prompt", () => ({
   PromptInput: z.any(),
@@ -25,6 +31,8 @@ mock.module("@/session/prompt", () => ({
     },
     async prompt(input: PromptCall) {
       promptCalls.push(input)
+      const requestedReportPath = parseReportPath(input.text)
+      const returnedReportPath = forcedReportPath ?? requestedReportPath ?? "spec/research/search-reports/fallback.md"
       return {
         info: {
           id: "message_assistant_search_tool",
@@ -45,7 +53,7 @@ mock.module("@/session/prompt", () => ({
             type: "text",
             sessionID: input.sessionID,
             messageID: "message_assistant_search_tool",
-            text: "REPORT_PATH: spec/research/search-reports/latest.md",
+            text: `REPORT_PATH: ${returnedReportPath}`,
           },
         ],
       }
@@ -65,6 +73,11 @@ beforeAll(async () => {
   process.env.OW_NAMESPACE = namespaceRoot
   process.env.OW_DATA_DIR = path.join(namespaceRoot, "data")
   projectID = "project-test-agentic-search"
+})
+
+beforeEach(() => {
+  promptCalls.length = 0
+  forcedReportPath = undefined
 })
 
 afterAll(async () => {
@@ -93,8 +106,8 @@ test("agentic_search returns report_path from search-agent output", async () => 
       projectID,
       abort: new AbortController().signal,
       messages: [],
-      metadata: async () => {},
-      ask: async () => {},
+      metadata: async () => { },
+      ask: async () => { },
     },
   )
 
@@ -104,13 +117,99 @@ test("agentic_search returns report_path from search-agent output", async () => 
     assistant_message_id: string
   }
 
-  expect(payload.report_path).toBe("spec/research/search-reports/latest.md")
+  expect(payload.report_path).toBe("spec/research/search-reports/how-to-design-search.md")
   expect(payload.sub_session_id.length).toBeGreaterThan(0)
   expect(payload.assistant_message_id).toBe("message_assistant_search_tool")
   expect(promptCalls[0]?.agent).toBe("search")
   expect(promptCalls[0]?.skipTitleGeneration).toBe(true)
   expect(promptCalls[0]?.text).toContain("query: how to design search")
   expect(promptCalls[0]?.text).toContain("query_context: planing article with evidence needs")
+  expect(promptCalls[0]?.text).toContain("report_path: spec/research/search-reports/how-to-design-search.md")
+})
+
+test("agentic_search builds pinyin slug for Chinese query", async () => {
+  const { AgenticSearchTool } = await loadAgenticSearchModule()
+  const tool = await AgenticSearchTool.init()
+
+  const result = await tool.execute(
+    {
+      query: "中文检索策略",
+      query_context: "context",
+    },
+    {
+      sessionID: "session-plan",
+      messageID: "message-plan",
+      agent: "plan",
+      threadID: "thread-plan",
+      projectID,
+      abort: new AbortController().signal,
+      messages: [],
+      metadata: async () => { },
+      ask: async () => { },
+    },
+  )
+
+  const payload = JSON.parse(result.output) as { report_path?: string }
+  expect(payload.report_path).toBe("spec/research/search-reports/zhong-wen-jian-suo-ce-lue.md")
+})
+
+test("agentic_search adds numeric suffix when report file already exists", async () => {
+  const { resolveWorkspacePath } = await import("../../src/util/workspace-path")
+  const { AgenticSearchTool } = await loadAgenticSearchModule()
+  const tool = await AgenticSearchTool.init()
+
+  const firstPath = "spec/research/search-reports/how-to-design-search.md"
+  const { resolvedPath } = resolveWorkspacePath(firstPath, projectID)
+  await mkdir(path.dirname(resolvedPath), { recursive: true })
+  await writeFile(resolvedPath, "existing", "utf8")
+
+  const result = await tool.execute(
+    {
+      query: "how to design search",
+      query_context: "context",
+    },
+    {
+      sessionID: "session-plan",
+      messageID: "message-plan",
+      agent: "plan",
+      threadID: "thread-plan",
+      projectID,
+      abort: new AbortController().signal,
+      messages: [],
+      metadata: async () => { },
+      ask: async () => { },
+    },
+  )
+
+  const payload = JSON.parse(result.output) as { report_path?: string }
+  expect(payload.report_path).toBe("spec/research/search-reports/how-to-design-search-2.md")
+  expect(promptCalls[0]?.text).toContain("report_path: spec/research/search-reports/how-to-design-search-2.md")
+})
+
+test("agentic_search rejects when search subagent returns mismatched report path", async () => {
+  const { AgenticSearchTool } = await loadAgenticSearchModule()
+  const tool = await AgenticSearchTool.init()
+  forcedReportPath = "spec/research/search-reports/wrong.md"
+
+  await expect(
+    tool.execute(
+      {
+        query: "expected query",
+        query_context: "context",
+      },
+      {
+        sessionID: "session-plan",
+        messageID: "message-plan",
+        agent: "plan",
+        threadID: "thread-plan",
+        projectID,
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: async () => { },
+        ask: async () => { },
+      },
+    ),
+  ).rejects.toThrow("unexpected REPORT_PATH")
 })
 
 test("agentic_search rejects non-plan callers", async () => {
@@ -131,8 +230,8 @@ test("agentic_search rejects non-plan callers", async () => {
         projectID,
         abort: new AbortController().signal,
         messages: [],
-        metadata: async () => {},
-        ask: async () => {},
+        metadata: async () => { },
+        ask: async () => { },
       },
     ),
   ).rejects.toThrow("Only the plan agent")
