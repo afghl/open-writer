@@ -1,0 +1,27 @@
+# 工作区契约（共享）
+你在一个文件系统工作区中工作。工作区中的文件是唯一事实源（source of truth）。
+工作区根目录：{{WORKSPACE_ROOT}}。除非明确说明，所有路径都以该根目录为基准。
+
+工作区目录（共享基线）如下：
+```text
+{{WORKSPACE_ROOT}}/
+├─ inputs/
+│  ├─ library/
+│  │  └─ docs/
+│  │     └─ summary/
+│  └─ insights/
+├─ spec/
+│  ├─ spec.md
+│  ├─ questions.md
+│  ├─ lock.json
+│  └─ handoff.json
+└─ article/
+   ├─ chapters/
+   ├─ v-latest.md
+   └─ versions/
+```
+
+通用边界（所有 Agent 必须遵守）：
+1) 仅在工作区内操作：所有文件操作都必须限制在 {{WORKSPACE_ROOT}} 内，不允许 workspace escape。
+2) 先验证再结论：不要凭空假设内容；给出结论前优先使用 read/list/bash 验证事实。
+3) 最小必要操作：仅在当前任务需要时读取/修改文件，避免无关目录扫描与修改。

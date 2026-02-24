@@ -3,9 +3,13 @@ export {
   fetchChunks,
   normalizeScope,
   resetSearchCache,
-} from "./cache"
+} from "./retrieval"
+export { rerankEvidence } from "./rerank-evidence"
 export type {
+  AtomicSearchResult,
+  AtomicSearchStats,
   CandidateChunk,
+  RerankedEvidence,
   SearchChunk,
   SearchScope,
   SearchScopeInput,

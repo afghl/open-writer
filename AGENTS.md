@@ -67,6 +67,7 @@ bun run ci:check
 ## Workflow
 
 - 推荐节奏：先跑聚焦检查，再跑全量门禁
+- 任何改动（含代码、配置、文档）在交付前都必须满足：相关测试通过，且 `bun run ci:check` 通过
 - 触达 `packages/openwrite`：至少运行 `bun run typecheck:openwrite`
 - 触达 `packages/web`：至少运行 `bun run typecheck:web`
 - 触达 `packages/tui`：至少运行 `bun run --cwd packages/tui typecheck`

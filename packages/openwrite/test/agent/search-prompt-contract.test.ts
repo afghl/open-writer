@@ -44,3 +44,9 @@ test("search prompt enforces pointer-only evidence ledger", () => {
   )
   expect(SEARCH_SYSTEM_PROMPT).toContain("禁止填写原文摘录")
 })
+
+test("search prompt uses atomic pinecone search flow without standalone rerank tool", () => {
+  expect(SEARCH_SYSTEM_PROMPT).toContain("- `pinecone_hybrid_search`")
+  expect(SEARCH_SYSTEM_PROMPT).toContain("单次 query，不做 query rewrite")
+  expect(SEARCH_SYSTEM_PROMPT).not.toContain("- `rerank`")
+})

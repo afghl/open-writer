@@ -106,8 +106,8 @@ test("agentic_search returns report_path from search-agent output", async () => 
       projectID,
       abort: new AbortController().signal,
       messages: [],
-      metadata: async () => {},
-      ask: async () => {},
+      metadata: async () => { },
+      ask: async () => { },
     },
   )
 
@@ -144,8 +144,8 @@ test("agentic_search builds pinyin slug for Chinese query", async () => {
       projectID,
       abort: new AbortController().signal,
       messages: [],
-      metadata: async () => {},
-      ask: async () => {},
+      metadata: async () => { },
+      ask: async () => { },
     },
   )
 
@@ -176,8 +176,8 @@ test("agentic_search adds numeric suffix when report file already exists", async
       projectID,
       abort: new AbortController().signal,
       messages: [],
-      metadata: async () => {},
-      ask: async () => {},
+      metadata: async () => { },
+      ask: async () => { },
     },
   )
 
@@ -205,8 +205,8 @@ test("agentic_search rejects when search subagent returns mismatched report path
         projectID,
         abort: new AbortController().signal,
         messages: [],
-        metadata: async () => {},
-        ask: async () => {},
+        metadata: async () => { },
+        ask: async () => { },
       },
     ),
   ).rejects.toThrow("unexpected REPORT_PATH")
@@ -230,8 +230,8 @@ test("agentic_search rejects non-plan callers", async () => {
         projectID,
         abort: new AbortController().signal,
         messages: [],
-        metadata: async () => {},
-        ask: async () => {},
+        metadata: async () => { },
+        ask: async () => { },
       },
     ),
   ).rejects.toThrow("Only the plan agent")
