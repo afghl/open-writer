@@ -1,7 +1,7 @@
 import { BaseAgent } from "./types"
 import SYSTEM_PROMPT from "./search.txt"
 import { rootHolder } from "@/global"
-import { SEARCH_TOOL_IDS } from "@/tool/search-shared"
+import { SEARCH_TOOL_IDS } from "../tool/search-shared"
 import { composeAgentPrompt } from "./prompt-compose"
 
 const SEARCH_AGENT_TOOL_IDS = [
@@ -26,7 +26,7 @@ export class SearchAgent extends BaseAgent {
         providerID: "openai",
         modelID: "gpt-4o-mini",
       },
-      steps: 8,
+      steps: 12,
       permission: {
         allowTools: Array.from(SEARCH_AGENT_TOOL_IDS),
       },

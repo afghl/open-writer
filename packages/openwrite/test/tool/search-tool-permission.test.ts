@@ -12,7 +12,7 @@ test("search tools are isolated to search agent", async () => {
   const writerTools = await ToolRegistry.tools(new WriterAgent())
   const searchTools = await ToolRegistry.tools(new SearchAgent())
 
-  const searchToolIDs = ["pinecone_hybrid_search", "resolve_chunk_evidence"]
+  const searchToolIDs = ["pinecone_hybrid_search", "resolve_chunk_evidence", "materialize_search_evidence"]
 
   for (const id of searchToolIDs) {
     expect(planTools.some((tool) => tool.id === id)).toBe(false)
@@ -28,6 +28,7 @@ test("search tools are isolated to search agent", async () => {
   const ids = searchTools.map((tool) => tool.id)
   expect(ids).toContain("pinecone_hybrid_search")
   expect(ids).toContain("resolve_chunk_evidence")
+  expect(ids).toContain("materialize_search_evidence")
   expect(ids).not.toContain("rerank")
   expect(ids).toContain("read")
   expect(ids).toContain("edit")
