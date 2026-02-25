@@ -8,8 +8,8 @@ import DESCRIPTION from "./agentic-search.txt"
 export const AGENTIC_SEARCH_TOOL_ID = "agentic_search" as const
 
 const AgenticSearchInputSchema = z.object({
-  query: z.string().min(1).describe("The query objective."),
-  query_context: z.string().min(1).describe("Extra context and constraints for the search task."),
+  query: z.string().min(1).describe("检索目标。"),
+  query_context: z.string().min(1).describe("检索任务的补充上下文与约束。"),
 })
 
 export type AgenticSearchToolInput = z.infer<typeof AgenticSearchInputSchema>
@@ -43,7 +43,7 @@ export function buildSearchPrompt(input: {
   reportPath: string
 }) {
   return [
-    "Run search and write the report file as required by your system prompt.",
+    "请按系统提示要求执行检索并写入报告文件。",
     `query: ${input.query}`,
     `query_context: ${input.queryContext}`,
     `report_path: ${input.reportPath}`,

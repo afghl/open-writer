@@ -88,16 +88,16 @@ export async function buildSummary(input: {
   const llm = LLM.for("library.summary")
 
   const prompt = [
-    "You are extracting a concise writing-library summary.",
-    "Return JSON only.",
-    "Rules:",
-    "- title should be human-readable and specific.",
-    "- tldr should be 1-2 sentences.",
-    "- keyPoints should contain actionable points for writing.",
-    "- evidencePoints should be concrete facts/claims from source.",
-    "- Do not hallucinate facts beyond source text.",
-    `Source label: ${input.sourceLabel}`,
-    "Source text:",
+    "你正在提取简洁的写作资料库摘要。",
+    "仅返回 JSON。",
+    "规则：",
+    "- title 应该可读且具体。",
+    "- tldr 应为 1-2 句话。",
+    "- keyPoints 应包含可执行的写作要点。",
+    "- evidencePoints 应为来源中的具体事实/主张。",
+    "- 不要臆造来源文本之外的事实。",
+    `来源标签：${input.sourceLabel}`,
+    "来源文本：",
     input.text.slice(0, 12000),
   ].join("\n")
 

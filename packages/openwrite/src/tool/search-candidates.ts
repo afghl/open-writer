@@ -3,7 +3,7 @@ import { Tool } from "./tool"
 import { fetchChunks, normalizeScope, rerankEvidence, searchCandidates, type AtomicSearchResult } from "@/search"
 
 const DESCRIPTION =
-  "Run atomic hybrid retrieval + evidence resolution + reranking and return final evidence results."
+  "执行原子化 hybrid 检索 + 证据解析 + 重排，并返回最终证据结果。"
 
 const FIXED_RETRIEVE_K = 15
 const FIXED_TOP_K = 10
@@ -16,8 +16,8 @@ const ScopeSchema = z.object({
 export const PineconeHybridSearchTool = Tool.define("pinecone_hybrid_search", async () => ({
   description: DESCRIPTION,
   parameters: z.object({
-    query: z.string().min(1).describe("Search query text."),
-    scope: ScopeSchema.describe("Optional scope (paths/extensions) under inputs/library."),
+    query: z.string().min(1).describe("检索查询文本。"),
+    scope: ScopeSchema.describe("inputs/library 下的可选范围（paths/extensions）。"),
   }),
   async execute(params, ctx) {
     const scope = normalizeScope(params.scope)

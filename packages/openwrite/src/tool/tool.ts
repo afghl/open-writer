@@ -56,7 +56,7 @@ export function defineTool<Parameters extends z.ZodType, Result extends ToolMeta
             throw new Error(toolInfo.formatValidationError(error), { cause: error })
           }
           throw new Error(
-            `The ${id} tool was called with invalid arguments: ${error}.\nPlease rewrite the input so it satisfies the expected schema.`,
+            `工具 ${id} 的调用参数无效：${error}。\n请重写输入，使其满足预期的 schema。`,
             { cause: error },
           )
         }

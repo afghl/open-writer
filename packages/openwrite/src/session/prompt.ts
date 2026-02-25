@@ -279,7 +279,7 @@ async function ensureTitleIfNeeded(
       user: firstUser,
       messageID: lastResult.info.id,
       messages: [
-        { role: "user", content: "Generate a concise title for this conversation:" },
+        { role: "user", content: "请为这段对话生成一个简洁标题：" },
         ...Message.toModelMessages(history.slice(0, firstRealUserIndex + 1)),
       ],
       tools: [],

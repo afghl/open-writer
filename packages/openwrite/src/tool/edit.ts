@@ -21,10 +21,10 @@ const diffStats = (before: string, after: string) => {
 export const EditTool = Tool.define("edit", async () => ({
   description: DESCRIPTION,
   parameters: z.object({
-    filePath: z.string().min(1).describe("The absolute path to the file to modify"),
-    oldString: z.string().describe("The text to replace"),
-    newString: z.string().describe("The text to replace it with (must be different from oldString)"),
-    replaceAll: z.boolean().optional().describe("Replace all occurrences of oldString (default false)"),
+    filePath: z.string().min(1).describe("要修改文件的绝对路径"),
+    oldString: z.string().describe("要替换的文本"),
+    newString: z.string().describe("替换后的文本（必须与 oldString 不同）"),
+    replaceAll: z.boolean().optional().describe("替换 oldString 的所有匹配项（默认 false）"),
   }),
   async execute(params, ctx: ToolContext) {
     const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(params.filePath, ctx.projectID)

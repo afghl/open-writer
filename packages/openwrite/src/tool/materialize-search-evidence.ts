@@ -7,7 +7,7 @@ import { resolveWorkspacePath } from "@/util/workspace-path"
 import { Tool } from "./tool"
 
 const DESCRIPTION =
-  "Materialize canonical evidence entries in the search report by replacing chunk_id placeholders under the evidence section."
+  "通过替换证据章节下的 chunk_id 占位符，在搜索报告中物化 canonical 证据条目。"
 
 const EVIDENCE_HEADING = "## 证据原文"
 const CHUNK_ID_RE = /chunk_id\s*[:=]\s*([^\s`"'|,\]]+)/gi
@@ -116,7 +116,7 @@ function renderEvidenceEntries(input: {
 export const MaterializeSearchEvidenceTool = Tool.define("materialize_search_evidence", async () => ({
   description: DESCRIPTION,
   parameters: z.object({
-    report_path: z.string().min(1).describe("Logical report path to materialize evidence entries in place."),
+    report_path: z.string().min(1).describe("需要原地物化证据条目的逻辑报告路径。"),
   }),
   async execute(params, ctx) {
     const {

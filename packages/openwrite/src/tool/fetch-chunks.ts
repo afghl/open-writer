@@ -3,13 +3,13 @@ import { Tool } from "./tool"
 import { fetchChunks } from "@/search"
 
 const DESCRIPTION =
-  "Resolve chunk evidence text by chunk IDs using canonical source text spans."
+  "通过 chunk ID 使用 canonical 源文本片段解析证据文本。"
 
 export const ResolveChunkEvidenceTool = Tool.define("resolve_chunk_evidence", async () => ({
   description: DESCRIPTION,
   parameters: z.object({
     chunk_ids: z.array(z.string().min(1)).min(1).max(100)
-      .describe("Chunk IDs to fetch in order."),
+      .describe("按顺序获取的 chunk ID 列表。"),
   }),
   async execute(params, ctx) {
     await ctx.ask({

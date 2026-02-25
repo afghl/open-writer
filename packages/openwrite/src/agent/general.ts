@@ -14,7 +14,7 @@ export class GeneralAgent extends BaseAgent {
     super({
       id: "general",
       name: "general",
-      description: "a general purpose agent",
+      description: "通用代理",
       prompt: SYSTEM_PROMPT,
       mode: "primary",
       native: true,

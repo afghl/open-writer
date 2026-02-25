@@ -17,7 +17,7 @@ export class SearchAgent extends BaseAgent {
     super({
       id: "search",
       name: "search",
-      description: "a retrieval-focused search agent",
+      description: "检索优先的搜索代理",
       prompt: systemPrompt,
       mode: "subagent",
       hidden: true,

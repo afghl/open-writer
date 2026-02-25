@@ -16,7 +16,7 @@ export class WriterAgent extends BaseAgent {
     super({
       id: "writer",
       name: "writer",
-      description: "a writing agent",
+      description: "写作代理",
       prompt: systemPrompt,
       mode: "primary",
       native: true,

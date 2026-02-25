@@ -1,10 +1,10 @@
-Performs exact string replacements in files. 
+在文件中执行精确字符串替换。
 
-Usage:
-- You must use your `Read` tool at least once in the conversation before editing. This tool will error if you attempt an edit without reading the file. 
-- When editing text from Read tool output, ensure you preserve the exact indentation (tabs/spaces) as it appears AFTER the line number prefix. The line number prefix format is: spaces + line number + tab. Everything after that tab is the actual file content to match. Never include any part of the line number prefix in the oldString or newString.
-- ALWAYS prefer editing existing files in the codebase. NEVER write new files unless explicitly required.
-- Only use emojis if the user explicitly requests it. Avoid adding emojis to files unless asked.
-- The edit will FAIL if `oldString` is not found in the file with an error "oldString not found in content".
-- The edit will FAIL if `oldString` is found multiple times in the file with an error "oldString found multiple times and requires more code context to uniquely identify the intended match". Either provide a larger string with more surrounding context to make it unique or use `replaceAll` to change every instance of `oldString`. 
-- Use `replaceAll` for replacing and renaming strings across the file. This parameter is useful if you want to rename a variable for instance.
+用法：
+- 在本次会话中进行编辑前，你必须至少调用一次 `Read` 工具。若未先读取文件就尝试编辑，此工具会报错。
+- 当基于 Read 工具输出的文本进行编辑时，必须保留行号前缀之后的精确缩进（tab/空格）。行号前缀格式是：空格 + 行号 + tab。该 tab 之后的内容才是要匹配的真实文件内容。`oldString` 和 `newString` 中绝不能包含任何行号前缀内容。
+- 始终优先编辑代码库中的已有文件。除非有明确要求，否则绝不新建文件。
+- 仅当用户明确要求时才使用 emoji。除非被要求，否则不要向文件中添加 emoji。
+- 若文件中找不到 `oldString`，编辑会失败，并返回错误 `"oldString not found in content"`。
+- 若文件中出现多个 `oldString`，编辑会失败，并返回错误 `"oldString found multiple times and requires more code context to uniquely identify the intended match"`。此时请提供包含更多上下文的更长字符串以确保唯一匹配，或使用 `replaceAll` 替换所有 `oldString`。
+- 跨文件内容进行替换和重命名时请使用 `replaceAll`。例如重命名变量时此参数很有用。

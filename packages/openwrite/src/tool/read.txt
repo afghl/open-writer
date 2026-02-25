@@ -1,12 +1,12 @@
-Reads a file from the local filesystem. You can access any file directly by using this tool.
-Assume this tool is able to read all files on the machine. If the User provides a path to a file assume that path is valid. It is okay to read a file that does not exist; an error will be returned.
+从本地文件系统读取文件。你可以使用此工具直接访问任意文件。
+假设此工具能够读取机器上的所有文件。如果用户提供了文件路径，假设该路径有效。读取不存在的文件也是允许的；系统会返回错误。
 
-Usage:
-- The filePath parameter must be an absolute path, not a relative path
-- By default, it reads up to 2000 lines starting from the beginning of the file
-- You can optionally specify a line offset and limit (especially handy for long files), but it's recommended to read the whole file by not providing these parameters
-- Any lines longer than 2000 characters will be truncated
-- Results are returned using cat -n format, with line numbers starting at 1
-- You have the capability to call multiple tools in a single response. It is always better to speculatively read multiple files as a batch that are potentially useful.
-- If you read a file that exists but has empty contents you will receive a system reminder warning in place of file contents.
-- You can read image files using this tool.
+用法：
+- `filePath` 参数必须是绝对路径，不能是相对路径
+- 默认从文件开头开始，最多读取 2000 行
+- 你可以可选传入行偏移和行数限制（对长文件尤其有用），但建议在不传这两个参数时直接读取整个文件
+- 任意超过 2000 个字符的单行都会被截断
+- 返回结果使用 `cat -n` 风格，行号从 1 开始
+- 你可以在一次响应中调用多个工具。通常更好的做法是推测性地批量读取可能有用的多个文件。
+- 如果读取到存在但内容为空的文件，你会收到系统提醒警告，替代文件内容显示。
+- 你可以用这个工具读取图片文件。

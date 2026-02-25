@@ -14,7 +14,7 @@ export class PlanAgent extends BaseAgent {
     super({
       id: "plan",
       name: "plan",
-      description: "a writing plan agent",
+      description: "写作规划代理",
       prompt: systemPrompt,
       mode: "primary",
       native: true,

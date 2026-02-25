@@ -4,7 +4,7 @@ import { Project } from "@/project"
 import { TaskRunner, TaskService } from "@/task"
 import { Tool } from "./tool"
 
-const DESCRIPTION = "Create a handoff task from plan to writer."
+const DESCRIPTION = "从 plan 到 writer 创建交接任务。"
 
 export const HandoffToWriterTool = Tool.define("handoff_to_writer", async () => ({
   description: DESCRIPTION,
@@ -12,7 +12,7 @@ export const HandoffToWriterTool = Tool.define("handoff_to_writer", async () => 
     reason: z
       .string()
       .min(1)
-      .describe("Why the plan is ready to handoff to writer."),
+      .describe("说明该计划为何已准备好交接给 writer。"),
   }),
   async execute(params, ctx) {
     if (ctx.agent !== "plan") {

@@ -28,19 +28,19 @@ export const ReadTool = Tool.define("read", async () => ({
     filePath: z
       .string()
       .min(1)
-      .describe("The path to the file to read"),
+      .describe("要读取的文件路径"),
     offset: z
       .number()
       .int()
       .min(0)
       .optional()
-      .describe("The line number to start reading from (0-based)"),
+      .describe("开始读取的行号（从 0 开始）"),
     limit: z
       .number()
       .int()
       .min(1)
       .optional()
-      .describe("The number of lines to read (defaults to 2000)"),
+      .describe("要读取的行数（默认 2000）"),
   }),
   async execute(params, ctx: ToolContext) {
     const { resolvedPath, logicalNamespacePath } = resolveWorkspacePath(params.filePath, ctx.projectID)

@@ -64,7 +64,7 @@ export function fromAgent<
             throw new Error(spec.formatValidationError(error), { cause: error })
           }
           throw new Error(
-            `The ${spec.id} tool was called with invalid arguments: ${error}.\nPlease rewrite the input so it satisfies the expected schema.`,
+            `工具 ${spec.id} 的调用参数无效：${error}。\n请重写输入，使其满足预期的 schema。`,
             { cause: error },
           )
         }
