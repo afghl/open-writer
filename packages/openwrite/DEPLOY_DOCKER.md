@@ -13,6 +13,7 @@ Edit `.env.docker` and set:
 
 - `OW_PROXY_TOKEN` (required in production)
 - `OPENAI_API_KEY` (required for LLM features)
+- `SUPADATA_API_KEY` (required if you import YouTube URL transcripts)
 - Optional Pinecone values if you use vector search
 
 ## 2) Start with Docker Compose

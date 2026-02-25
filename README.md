@@ -149,6 +149,7 @@ bun run dev:web
 常用：
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
+- `SUPADATA_API_KEY`（YouTube URL transcript 导入）
 - `PINECONE_API_KEY`
 - `OW_PINECONE_INDEX`
 - `OW_EMBEDDING_MODEL`

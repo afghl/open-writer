@@ -47,6 +47,8 @@ export function libraryErrorResponse(c: Context, error: unknown) {
     case "REPLACE_DOC_NOT_FOUND":
     case "YOUTUBE_TRANSCRIPT_UNAVAILABLE":
       return c.json({ error: error.message, code: error.code }, 404)
+    case "YOUTUBE_TRANSCRIPT_CONFIG_ERROR":
+      return c.json({ error: error.message, code: error.code }, 500)
     default:
       return c.json({ error: error.message, code: error.code }, 500)
   }

@@ -1,13 +1,18 @@
 import { createHash } from "node:crypto"
 import { PDFParse } from "pdf-parse"
-import { YoutubeTranscript } from "youtube-transcript"
+import { Log } from "@/util/log"
 import { LibraryServiceError, type LibraryFileExt } from "./types"
+import {
+  loadYouTubeMetadataByVideoID,
+  loadYouTubeTranscriptTextByVideoID,
+} from "./youtube-transcript"
 
 export type ParsedSource = {
   sourceType: "file" | "youtube"
   text: string
   canonicalURL?: string
   videoID?: string
+  sourceTitle?: string
 }
 
 const YOUTUBE_HOSTS = ["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"]
@@ -97,7 +102,7 @@ export async function parseFileBuffer(input: {
       const result = await parser.getText()
       extracted = normalizeNewlines(result.text ?? "").trim()
     } finally {
-      await parser.destroy().catch(() => {})
+      await parser.destroy().catch(() => { })
     }
   } catch (error) {
     throw new LibraryServiceError(
@@ -118,34 +123,30 @@ export async function parseFileBuffer(input: {
 export async function parseYouTubeTranscript(rawURL: string): Promise<ParsedSource> {
   const { videoID, canonicalURL } = parseYouTubeURL(rawURL)
 
-  let transcriptLines: Array<{ text?: string }> = []
+  let text = ""
   try {
-    transcriptLines = await YoutubeTranscript.fetchTranscript(canonicalURL)
-  } catch {
-    throw new LibraryServiceError(
-      "YOUTUBE_TRANSCRIPT_UNAVAILABLE",
-      "Unable to fetch YouTube transcript",
-    )
+    text = await loadYouTubeTranscriptTextByVideoID(videoID)
+  } catch (error) {
+    Log.Default.error("Unable to fetch YouTube transcript", { videoID, canonicalURL, error })
+    if (error instanceof LibraryServiceError) throw error
+    throw new LibraryServiceError("YOUTUBE_TRANSCRIPT_UNAVAILABLE", "Unable to fetch YouTube transcript")
   }
 
-  const text = transcriptLines
-    .map((line) => (line.text ?? "").trim())
-    .filter((line) => line.length > 0)
-    .join("\n")
-    .trim()
+  const sourceTitle = (await loadYouTubeMetadataByVideoID(videoID)).title?.trim() ?? ""
 
-  if (!text) {
-    throw new LibraryServiceError(
-      "YOUTUBE_TRANSCRIPT_UNAVAILABLE",
-      "YouTube transcript is empty",
-    )
-  }
+  Log.Default.info("Fetched YouTube transcript", {
+    videoID,
+    canonicalURL,
+    textLength: text.length,
+    hasSourceTitle: sourceTitle.length > 0,
+  })
 
   return {
     sourceType: "youtube",
     text,
     canonicalURL,
     videoID,
+    ...(sourceTitle ? { sourceTitle } : {}),
   }
 }
 

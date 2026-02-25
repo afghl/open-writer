@@ -21,6 +21,7 @@ import {
   type LibraryImportMode,
   type SummaryRecord,
 } from "./types"
+import { Log } from "@/util/log"
 
 // Keep defaults Vercel-friendly when Web uploads are proxied through API routes.
 const DEFAULT_IMPORT_MAX_PDF_MB = 4
@@ -296,94 +297,71 @@ function sourceLabel(input: {
 }
 
 export async function createImport(input: {
-    projectID: string
-    replaceDocID?: string
-    file?: {
-      name: string
-      type: string
-      size: number
-      bytes: Buffer
-    }
-    url?: string
-  }) {
-    const hasFile = !!input.file
-    const hasURL = !!input.url?.trim()
+  projectID: string
+  replaceDocID?: string
+  file?: {
+    name: string
+    type: string
+    size: number
+    bytes: Buffer
+  }
+  url?: string
+}) {
+  const hasFile = !!input.file
+  const hasURL = !!input.url?.trim()
 
-    if ((hasFile && hasURL) || (!hasFile && !hasURL)) {
+  if ((hasFile && hasURL) || (!hasFile && !hasURL)) {
+    throw new LibraryServiceError(
+      "INVALID_IMPORT_INPUT",
+      "Provide either file or url",
+    )
+  }
+
+  const replaceDocID = input.replaceDocID?.trim() || undefined
+  if (replaceDocID) {
+    const existing = await tryReadDoc(input.projectID, replaceDocID)
+    if (!existing) {
+      throw new LibraryServiceError("REPLACE_DOC_NOT_FOUND", `Doc not found: ${replaceDocID}`)
+    }
+  }
+
+  const importID = Identifier.ascending("import")
+  const createdAt = Date.now()
+
+  if (input.file) {
+    const name = input.file.name?.trim() || ""
+    if (!name) {
+      throw new LibraryServiceError("INVALID_FILE", "File name is required")
+    }
+
+    const ext = inferFileExt(name)
+    if (!ext) {
+      throw new LibraryServiceError("UNSUPPORTED_FILE_TYPE", "Only PDF, TXT, and MD files are supported")
+    }
+
+    const maxBytes = importMaxBytesForExt(ext)
+    if (input.file.size > maxBytes) {
       throw new LibraryServiceError(
-        "INVALID_IMPORT_INPUT",
-        "Provide either file or url",
+        "FILE_TOO_LARGE",
+        `File exceeds limit of ${Math.floor(maxBytes / (1024 * 1024))}MB`,
       )
     }
 
-    const replaceDocID = input.replaceDocID?.trim() || undefined
-    if (replaceDocID) {
-      const existing = await tryReadDoc(input.projectID, replaceDocID)
-      if (!existing) {
-        throw new LibraryServiceError("REPLACE_DOC_NOT_FOUND", `Doc not found: ${replaceDocID}`)
-      }
-    }
-
-    const importID = Identifier.ascending("import")
-    const createdAt = Date.now()
-
-    if (input.file) {
-      const name = input.file.name?.trim() || ""
-      if (!name) {
-        throw new LibraryServiceError("INVALID_FILE", "File name is required")
-      }
-
-      const ext = inferFileExt(name)
-      if (!ext) {
-        throw new LibraryServiceError("UNSUPPORTED_FILE_TYPE", "Only PDF, TXT, and MD files are supported")
-      }
-
-      const maxBytes = importMaxBytesForExt(ext)
-      if (input.file.size > maxBytes) {
-        throw new LibraryServiceError(
-          "FILE_TOO_LARGE",
-          `File exceeds limit of ${Math.floor(maxBytes / (1024 * 1024))}MB`,
-        )
-      }
-
-      const payloadPath = getPayloadPath(input.projectID, importID, ext)
-      await ensureDir(path.dirname(payloadPath))
-      await fs.writeFile(payloadPath, input.file.bytes)
-
-      const created: LibraryImportInfoType = {
-        id: importID,
-        project_id: input.projectID,
-        input: {
-          mode: "file",
-          replace_doc_id: replaceDocID,
-          file_name: name,
-          file_ext: ext,
-          file_mime: input.file.type,
-          file_size: input.file.size,
-          payload_path: payloadPath,
-        },
-        status: "queued",
-        stage: "queued",
-        time: {
-          created: createdAt,
-        },
-      }
-      await writeImport(input.projectID, created)
-      return created
-    }
-
-    const rawURL = input.url?.trim() || ""
-    if (!rawURL) {
-      throw new LibraryServiceError("INVALID_URL", "URL is required")
-    }
+    const payloadPath = getPayloadPath(input.projectID, importID, ext)
+    await ensureDir(path.dirname(payloadPath))
+    await fs.writeFile(payloadPath, input.file.bytes)
 
     const created: LibraryImportInfoType = {
       id: importID,
       project_id: input.projectID,
       input: {
-        mode: "url",
+        mode: "file",
         replace_doc_id: replaceDocID,
-        url: rawURL,
+        file_name: name,
+        file_ext: ext,
+        file_mime: input.file.type,
+        file_size: input.file.size,
+        payload_path: payloadPath,
       },
       status: "queued",
       stage: "queued",
@@ -394,6 +372,29 @@ export async function createImport(input: {
     await writeImport(input.projectID, created)
     return created
   }
+
+  const rawURL = input.url?.trim() || ""
+  if (!rawURL) {
+    throw new LibraryServiceError("INVALID_URL", "URL is required")
+  }
+
+  const created: LibraryImportInfoType = {
+    id: importID,
+    project_id: input.projectID,
+    input: {
+      mode: "url",
+      replace_doc_id: replaceDocID,
+      url: rawURL,
+    },
+    status: "queued",
+    stage: "queued",
+    time: {
+      created: createdAt,
+    },
+  }
+  await writeImport(input.projectID, created)
+  return created
+}
 
 export async function getImport(projectID: string, importID: string) {
   return readImport(projectID, importID)
@@ -417,288 +418,290 @@ export async function listPendingImports() {
   const root = path.join(openwriteDataDir(), "library_import")
   const projectDirs = await fs.readdir(root, { withFileTypes: true }).catch(() => [])
 
-    for (const projectEntry of projectDirs) {
-      if (!projectEntry.isDirectory()) continue
-      const projectID = projectEntry.name
-      const importSegments = await Storage.list(["library_import", projectID])
-      for (const importSegment of importSegments) {
-        const item = await Storage.read<LibraryImportInfoType>(importSegment)
-        if (item.status === "queued" || item.status === "processing") {
-          all.push(item)
-        }
+  for (const projectEntry of projectDirs) {
+    if (!projectEntry.isDirectory()) continue
+    const projectID = projectEntry.name
+    const importSegments = await Storage.list(["library_import", projectID])
+    for (const importSegment of importSegments) {
+      const item = await Storage.read<LibraryImportInfoType>(importSegment)
+      if (item.status === "queued" || item.status === "processing") {
+        all.push(item)
       }
     }
+  }
 
   all.sort((a, b) => a.time.created - b.time.created)
   return all
 }
 
-  async function markStage(projectID: string, importID: string, stage: LibraryImportInfoType["stage"]) {
-    return updateImport(projectID, importID, (draft) => {
-      draft.status = "processing"
-      draft.stage = stage
-      if (!draft.time.started) {
-        draft.time.started = Date.now()
-      }
-    })
-  }
-
-  async function markFail(projectID: string, importID: string, error: { code: string; message: string }) {
-    return updateImport(projectID, importID, (draft) => {
-      draft.status = "fail"
-      draft.stage = "fail"
-      draft.error = error
-      draft.time.finished = Date.now()
-    })
-  }
-
-  async function markSuccess(input: {
-    projectID: string
-    importID: string
-    docID: string
-    docPath: string
-    summaryPath: string
-  }) {
-    return updateImport(input.projectID, input.importID, (draft) => {
-      draft.status = "success"
-      draft.stage = "success"
-      draft.error = undefined
-      draft.result = {
-        doc_id: input.docID,
-        doc_path: input.docPath,
-        summary_path: input.summaryPath,
-      }
-      draft.time.finished = Date.now()
-    })
-  }
-
-  async function refreshSummaryIndex(projectID: string) {
-    const docs = await listDocs(projectID)
-    const markdown = buildSummaryIndexMarkdown(projectID, docs)
-    await writeWorkspaceFile({
-      projectID,
-      logicalPath: summaryIndexLogical(projectID),
-      content: markdown,
-      source: "external_upload",
-    })
-  }
-
-  async function saveDoc(input: {
-    projectID: string
-    docID: string
-    sourceType: "file" | "youtube"
-    sourceURL?: string
-    fileExt: LibraryFileExt
-    docPath: string
-    sourceTextPath: string
-    summaryPath: string
-    title: string
-    titleSlug: string
-    vectorIDs: string[]
-    chunkCount: number
-    createdAt: number
-    updatedAt: number
-    status: LibraryDocStatus
-  }) {
-    const doc: LibraryDocInfo = {
-      id: input.docID,
-      project_id: input.projectID,
-      title: input.title,
-      title_slug: input.titleSlug,
-      source_type: input.sourceType,
-      source_url: input.sourceURL,
-      file_ext: input.fileExt,
-      doc_path: input.docPath,
-      source_text_path: input.sourceTextPath,
-      summary_path: input.summaryPath,
-      vector_ids: input.vectorIDs,
-      chunk_count: input.chunkCount,
-      status: input.status,
-      created_at: input.createdAt,
-      updated_at: input.updatedAt,
+async function markStage(projectID: string, importID: string, stage: LibraryImportInfoType["stage"]) {
+  return updateImport(projectID, importID, (draft) => {
+    draft.status = "processing"
+    draft.stage = stage
+    if (!draft.time.started) {
+      draft.time.started = Date.now()
     }
-    await writeDoc(input.projectID, doc)
-    return doc
+  })
+}
+
+async function markFail(projectID: string, importID: string, error: { code: string; message: string }) {
+  return updateImport(projectID, importID, (draft) => {
+    draft.status = "fail"
+    draft.stage = "fail"
+    draft.error = error
+    draft.time.finished = Date.now()
+  })
+}
+
+async function markSuccess(input: {
+  projectID: string
+  importID: string
+  docID: string
+  docPath: string
+  summaryPath: string
+}) {
+  return updateImport(input.projectID, input.importID, (draft) => {
+    draft.status = "success"
+    draft.stage = "success"
+    draft.error = undefined
+    draft.result = {
+      doc_id: input.docID,
+      doc_path: input.docPath,
+      summary_path: input.summaryPath,
+    }
+    draft.time.finished = Date.now()
+  })
+}
+
+async function refreshSummaryIndex(projectID: string) {
+  const docs = await listDocs(projectID)
+  const markdown = buildSummaryIndexMarkdown(projectID, docs)
+  await writeWorkspaceFile({
+    projectID,
+    logicalPath: summaryIndexLogical(projectID),
+    content: markdown,
+    source: "external_upload",
+  })
+}
+
+async function saveDoc(input: {
+  projectID: string
+  docID: string
+  sourceType: "file" | "youtube"
+  sourceURL?: string
+  fileExt: LibraryFileExt
+  docPath: string
+  sourceTextPath: string
+  summaryPath: string
+  title: string
+  titleSlug: string
+  vectorIDs: string[]
+  chunkCount: number
+  createdAt: number
+  updatedAt: number
+  status: LibraryDocStatus
+}) {
+  const doc: LibraryDocInfo = {
+    id: input.docID,
+    project_id: input.projectID,
+    title: input.title,
+    title_slug: input.titleSlug,
+    source_type: input.sourceType,
+    source_url: input.sourceURL,
+    file_ext: input.fileExt,
+    doc_path: input.docPath,
+    source_text_path: input.sourceTextPath,
+    summary_path: input.summaryPath,
+    vector_ids: input.vectorIDs,
+    chunk_count: input.chunkCount,
+    status: input.status,
+    created_at: input.createdAt,
+    updated_at: input.updatedAt,
   }
+  await writeDoc(input.projectID, doc)
+  return doc
+}
 
 export async function processImport(importTask: LibraryImportInfoType) {
-    const projectID = importTask.project_id
-    const importID = importTask.id
-    const pinecone = getPineconeService()
+  const projectID = importTask.project_id
+  const importID = importTask.id
+  const pinecone = getPineconeService()
 
-    await markStage(projectID, importID, "validating")
+  await markStage(projectID, importID, "validating")
 
-    let payloadPath = importTask.input.payload_path
+  let payloadPath = importTask.input.payload_path
 
-    try {
-      await ensureSummaryLayout(projectID)
+  try {
+    await ensureSummaryLayout(projectID)
 
-      const replaceDocID = importTask.input.replace_doc_id?.trim() || ""
-      const replaceDoc = replaceDocID ? await readDoc(projectID, replaceDocID) : undefined
+    const replaceDocID = importTask.input.replace_doc_id?.trim() || ""
+    const replaceDoc = replaceDocID ? await readDoc(projectID, replaceDocID) : undefined
 
-      await markStage(projectID, importID, "ingesting")
+    await markStage(projectID, importID, "ingesting")
 
-      let fileExt: LibraryFileExt
-      let rawBytes: Buffer
-      let parsedText = ""
-      let sourceType: "file" | "youtube" = "file"
-      let canonicalURL = ""
+    let fileExt: LibraryFileExt
+    let rawBytes: Buffer
+    let parsedText = ""
+    let sourceType: "file" | "youtube" = "file"
+    let canonicalURL = ""
+    let sourceTitle = ""
 
-      await markStage(projectID, importID, "parsing")
-      if (importTask.input.mode === "file") {
-        const ext = importTask.input.file_ext
-        const rawPath = importTask.input.payload_path
-        if (!ext || !rawPath) {
-          throw new LibraryServiceError("INVALID_IMPORT_INPUT", "Missing upload payload")
-        }
-        fileExt = ext
-        payloadPath = rawPath
-        rawBytes = await fs.readFile(rawPath)
-        const parsed = await parseFileBuffer({
-          ext,
-          buffer: rawBytes,
-        })
-        sourceType = parsed.sourceType
-        parsedText = parsed.text
-      } else {
-        const rawURL = importTask.input.url?.trim() || ""
-        if (!rawURL) {
-          throw new LibraryServiceError("INVALID_URL", "URL is required")
-        }
-        const parsed = await parseYouTubeTranscript(rawURL)
-        sourceType = parsed.sourceType
-        parsedText = parsed.text
-        canonicalURL = parsed.canonicalURL ?? ""
-        rawBytes = Buffer.from(parsed.text, "utf8")
-        fileExt = "txt"
+    await markStage(projectID, importID, "parsing")
+    if (importTask.input.mode === "file") {
+      const ext = importTask.input.file_ext
+      const rawPath = importTask.input.payload_path
+      if (!ext || !rawPath) {
+        throw new LibraryServiceError("INVALID_IMPORT_INPUT", "Missing upload payload")
       }
-
-      await markStage(projectID, importID, "summarizing_title")
-      const summary = await buildSummary({
-        text: parsedText,
-        sourceLabel: sourceLabel({
-          mode: importTask.input.mode,
-          fileName: importTask.input.file_name,
-          url: canonicalURL || importTask.input.url,
-        }),
+      fileExt = ext
+      payloadPath = rawPath
+      rawBytes = await fs.readFile(rawPath)
+      const parsed = await parseFileBuffer({
+        ext,
+        buffer: rawBytes,
       })
-      const title = normalizeTitle(summary)
-      const titleSlug = slugifyTitle(title)
-
-      const docID = replaceDoc?.id ?? buildDocID(importID, title)
-      const docPath = replaceDoc?.doc_path ?? `${docsRootLogical(projectID)}/${titleSlug}--${docID}.${fileExt}`
-      const sourceTextPath = replaceDoc?.source_text_path
-        ?? `${textRootLogical(projectID)}/${titleSlug}--${docID}.txt`
-      const summaryPath = replaceDoc?.summary_path ?? `${summaryRootLogical(projectID)}/${titleSlug}--${docID}.md`
-
-      await markStage(projectID, importID, "chunking")
-      const chunks = chunkText({
-        docID,
-        text: parsedText,
-      })
-
-      await markStage(projectID, importID, "embedding")
-      const embeddings = await embedChunks({
-        chunks,
-        requireRemoteEmbedding: pinecone.enabled,
-      })
-
-      await markStage(projectID, importID, "pinecone_upsert")
-      const vectorIDs = embeddings.map((item) => item.id)
-      await pinecone.upsert(projectID, embeddings.map((embedding, index) => ({
-        id: embedding.id,
-        values: embedding.values,
-        sparseValues: sparseVectorFromText(chunks[index]?.text ?? ""),
-        metadata: {
-          project_id: projectID,
-          doc_id: docID,
-          chunk_id: embedding.id,
-          title,
-          source_type: sourceType,
-          source_path: docPath,
-          source_text_path: sourceTextPath,
-          chunk_index: chunks[index]?.index ?? index,
-          offset_start: chunks[index]?.offset_start ?? 0,
-          text_len: chunks[index]?.text_len ?? 0,
-          snippet: chunks[index]?.snippet ?? "",
-          import_id: importID,
-          ...(canonicalURL ? { source_url: canonicalURL } : {}),
-        },
-      })))
-
-      if (replaceDoc?.vector_ids && replaceDoc.vector_ids.length > 0) {
-        const staleIDs = replaceDoc.vector_ids.filter((item) => !vectorIDs.includes(item))
-        if (staleIDs.length > 0) {
-          await pinecone.delete(projectID, staleIDs)
-        }
+      sourceType = parsed.sourceType
+      parsedText = parsed.text
+    } else {
+      const rawURL = importTask.input.url?.trim() || ""
+      if (!rawURL) {
+        throw new LibraryServiceError("INVALID_URL", "URL is required")
       }
+      const parsed = await parseYouTubeTranscript(rawURL)
+      sourceType = parsed.sourceType
+      parsedText = parsed.text
+      canonicalURL = parsed.canonicalURL ?? ""
+      sourceTitle = parsed.sourceTitle?.trim() ?? ""
+      rawBytes = Buffer.from(parsed.text, "utf8")
+      fileExt = "txt"
+    }
 
-      await markStage(projectID, importID, "writing_summary")
-      await writeWorkspaceFile({
-        projectID,
-        logicalPath: docPath,
-        content: rawBytes,
-        source: "external_upload",
-      })
-      await writeWorkspaceFile({
-        projectID,
-        logicalPath: sourceTextPath,
-        content: parsedText,
-        source: "external_upload",
-      })
+    await markStage(projectID, importID, "summarizing_title")
+    const summary = await buildSummary({
+      text: parsedText,
+      sourceLabel: sourceLabel({
+        mode: importTask.input.mode,
+        fileName: importTask.input.file_name,
+        url: canonicalURL || importTask.input.url,
+      }),
+    })
+    const title = sourceTitle || normalizeTitle(summary)
+    const titleSlug = slugifyTitle(title)
 
-      const summaryMarkdown = renderSummaryMarkdown({
+    const docID = replaceDoc?.id ?? buildDocID(importID, title)
+    const docPath = replaceDoc?.doc_path ?? `${docsRootLogical(projectID)}/${titleSlug}--${docID}.${fileExt}`
+    const sourceTextPath = replaceDoc?.source_text_path
+      ?? `${textRootLogical(projectID)}/${titleSlug}--${docID}.txt`
+    const summaryPath = replaceDoc?.summary_path ?? `${summaryRootLogical(projectID)}/${titleSlug}--${docID}.md`
+
+    await markStage(projectID, importID, "chunking")
+    const chunks = chunkText({
+      docID,
+      text: parsedText,
+    })
+    Log.Default.info("Chunks created", { docID, chunksCount: chunks.length })
+    await markStage(projectID, importID, "embedding")
+    const embeddings = await embedChunks({
+      chunks,
+      requireRemoteEmbedding: pinecone.enabled,
+    })
+
+    await markStage(projectID, importID, "pinecone_upsert")
+    const vectorIDs = embeddings.map((item) => item.id)
+    await pinecone.upsert(projectID, embeddings.map((embedding, index) => ({
+      id: embedding.id,
+      values: embedding.values,
+      sparseValues: sparseVectorFromText(chunks[index]?.text ?? ""),
+      metadata: {
+        project_id: projectID,
+        doc_id: docID,
+        chunk_id: embedding.id,
         title,
-        tldr: summary.tldr.replace(/\s+/g, " ").trim(),
-        keyPoints: normalizeSummaryItems(summary.keyPoints),
-        evidencePoints: normalizeSummaryItems(summary.evidencePoints),
-        source: canonicalURL || importTask.input.file_name || docPath,
-      })
-      await writeWorkspaceFile({
-        projectID,
-        logicalPath: summaryPath,
-        content: summaryMarkdown,
-        source: "external_upload",
-      })
+        source_type: sourceType,
+        source_path: docPath,
+        source_text_path: sourceTextPath,
+        chunk_index: chunks[index]?.index ?? index,
+        offset_start: chunks[index]?.offset_start ?? 0,
+        text_len: chunks[index]?.text_len ?? 0,
+        snippet: chunks[index]?.snippet ?? "",
+        import_id: importID,
+        ...(canonicalURL ? { source_url: canonicalURL } : {}),
+      },
+    })))
 
-      const now = Date.now()
-      await saveDoc({
-        projectID,
-        docID,
-        sourceType,
-        sourceURL: canonicalURL || undefined,
-        fileExt,
-        docPath,
-        sourceTextPath,
-        summaryPath,
-        title,
-        titleSlug,
-        vectorIDs,
-        chunkCount: chunks.length,
-        status: "ready",
-        createdAt: replaceDoc?.created_at ?? now,
-        updatedAt: now,
-      })
-
-      await markStage(projectID, importID, "refresh_index")
-      await refreshSummaryIndex(projectID)
-
-      await markSuccess({
-        projectID,
-        importID,
-        docID,
-        docPath,
-        summaryPath,
-      })
-    } catch (error) {
-      const parsedError = asError(error)
-      await markFail(projectID, importID, parsedError)
-    } finally {
-      if (payloadPath) {
-        await fs.rm(payloadPath, { force: true }).catch(() => {})
+    if (replaceDoc?.vector_ids && replaceDoc.vector_ids.length > 0) {
+      const staleIDs = replaceDoc.vector_ids.filter((item) => !vectorIDs.includes(item))
+      if (staleIDs.length > 0) {
+        await pinecone.delete(projectID, staleIDs)
       }
     }
+
+    await markStage(projectID, importID, "writing_summary")
+    await writeWorkspaceFile({
+      projectID,
+      logicalPath: docPath,
+      content: rawBytes,
+      source: "external_upload",
+    })
+    await writeWorkspaceFile({
+      projectID,
+      logicalPath: sourceTextPath,
+      content: parsedText,
+      source: "external_upload",
+    })
+
+    const summaryMarkdown = renderSummaryMarkdown({
+      title,
+      tldr: summary.tldr.replace(/\s+/g, " ").trim(),
+      keyPoints: normalizeSummaryItems(summary.keyPoints),
+      evidencePoints: normalizeSummaryItems(summary.evidencePoints),
+      source: canonicalURL || importTask.input.file_name || docPath,
+    })
+    await writeWorkspaceFile({
+      projectID,
+      logicalPath: summaryPath,
+      content: summaryMarkdown,
+      source: "external_upload",
+    })
+
+    const now = Date.now()
+    await saveDoc({
+      projectID,
+      docID,
+      sourceType,
+      sourceURL: canonicalURL || undefined,
+      fileExt,
+      docPath,
+      sourceTextPath,
+      summaryPath,
+      title,
+      titleSlug,
+      vectorIDs,
+      chunkCount: chunks.length,
+      status: "ready",
+      createdAt: replaceDoc?.created_at ?? now,
+      updatedAt: now,
+    })
+
+    await markStage(projectID, importID, "refresh_index")
+    await refreshSummaryIndex(projectID)
+
+    await markSuccess({
+      projectID,
+      importID,
+      docID,
+      docPath,
+      summaryPath,
+    })
+  } catch (error) {
+    const parsedError = asError(error)
+    await markFail(projectID, importID, parsedError)
+  } finally {
+    if (payloadPath) {
+      await fs.rm(payloadPath, { force: true }).catch(() => { })
+    }
   }
+}
 
 export function isPineconeEnabled() {
   return getPineconeService().enabled
