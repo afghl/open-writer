@@ -24,9 +24,9 @@ export class SearchAgent extends BaseAgent {
       native: true,
       model: {
         providerID: "openai",
-        modelID: "gpt-4o-mini",
+        modelID: "gpt-5.1",
       },
-      steps: 20,
+      steps: 50,
       permission: {
         allowTools: Array.from(SEARCH_AGENT_TOOL_IDS),
       },
