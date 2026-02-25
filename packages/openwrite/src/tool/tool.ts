@@ -1,7 +1,6 @@
 import z from "zod"
 import type { MessageWithParts } from "@/session"
 import type { PermissionRequest } from "@/permission"
-import { fromAgent } from "./from-agent"
 
 export interface ToolMetadata {
   [key: string]: any
@@ -69,5 +68,4 @@ export function defineTool<Parameters extends z.ZodType, Result extends ToolMeta
 
 export const Tool = {
   define: defineTool,
-  fromAgent,
 }

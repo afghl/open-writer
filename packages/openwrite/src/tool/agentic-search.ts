@@ -1,8 +1,7 @@
 import z from "zod"
-import { agentRegistry } from "@/agent"
 import { Session, SessionPrompt, type MessageTextPart, type MessageWithParts } from "@/session"
 import { resolveUniqueSearchReportPath, searchReportPathPlaceholder } from "@/util/search-report-path"
-import { Tool } from "./tool"
+import { fromAgent } from "./from-agent"
 import DESCRIPTION from "./agentic-search.txt"
 
 export const AGENTIC_SEARCH_TOOL_ID = "agentic_search" as const
@@ -86,8 +85,6 @@ export function parseSearchAssistantResult(message: MessageWithParts) {
 }
 
 export async function runAgenticSearch(input: AgenticSearchRunInput): Promise<AgenticSearchRunOutput> {
-  agentRegistry.resolveStrict("search")
-
   const expectedReportPath = await resolveUniqueSearchReportPath({
     projectID: input.projectID,
     query: input.query,
@@ -131,7 +128,7 @@ export async function runAgenticSearch(input: AgenticSearchRunInput): Promise<Ag
   }
 }
 
-export const AgenticSearchTool = Tool.fromAgent({
+export const AgenticSearchTool = fromAgent({
   id: AGENTIC_SEARCH_TOOL_ID,
   targetAgentID: "search",
   description: DESCRIPTION,

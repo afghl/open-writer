@@ -20,6 +20,7 @@ export function inferFileExt(fileName: string) {
   const lower = fileName.trim().toLowerCase()
   if (lower.endsWith(".pdf")) return "pdf" as const
   if (lower.endsWith(".txt")) return "txt" as const
+  if (lower.endsWith(".md")) return "md" as const
   return undefined
 }
 
@@ -28,7 +29,7 @@ export function ensureAllowedFileExt(fileName: string): LibraryFileExt {
   if (!ext) {
     throw new LibraryServiceError(
       "UNSUPPORTED_FILE_TYPE",
-      `Only PDF or TXT files are allowed: ${fileName}`,
+      `Only PDF, TXT, or MD files are allowed: ${fileName}`,
     )
   }
   return ext
@@ -76,10 +77,10 @@ export async function parseFileBuffer(input: {
   ext: LibraryFileExt
   buffer: Buffer
 }): Promise<ParsedSource> {
-  if (input.ext === "txt") {
+  if (input.ext === "txt" || input.ext === "md") {
     const text = normalizeNewlines(input.buffer.toString("utf8")).trim()
     if (!text) {
-      throw new LibraryServiceError("EMPTY_TEXT", "The uploaded TXT file is empty")
+      throw new LibraryServiceError("EMPTY_TEXT", "The uploaded TXT/MD file is empty")
     }
     return {
       sourceType: "file",

@@ -47,7 +47,7 @@ export type OpenwriteLibraryDoc = {
   title_slug: string
   source_type: "file" | "youtube"
   source_url?: string
-  file_ext: "pdf" | "txt"
+  file_ext: "pdf" | "txt" | "md"
   doc_path: string
   summary_path: string
   vector_ids: string[]
@@ -64,7 +64,7 @@ export type OpenwriteLibraryImport = {
     mode: "file" | "url"
     replace_doc_id?: string
     file_name?: string
-    file_ext?: "pdf" | "txt"
+    file_ext?: "pdf" | "txt" | "md"
     file_mime?: string
     file_size?: number
     payload_path?: string

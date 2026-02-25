@@ -139,7 +139,7 @@ export function LibraryImportModal({ open, projectID, onClose, onImported }: Lib
     setImportError(null)
 
     if (mode === "file" && !file) {
-      setImportError("请选择 PDF 或 TXT 文件")
+      setImportError("请选择 PDF、TXT 或 MD 文件")
       return
     }
     if (mode === "file" && file && file.size > MAX_UPLOAD_BYTES) {
@@ -212,7 +212,7 @@ export function LibraryImportModal({ open, projectID, onClose, onImported }: Lib
                 onClick={() => setMode("file")}
                 className={`rounded-lg border px-3 py-2 text-sm font-medium ${mode === "file" ? "border-orange-300 bg-orange-50 text-orange-700" : "border-stone-200 text-stone-600"}`}
               >
-                上传文件 (PDF/TXT)
+                上传文件 (PDF/TXT/MD)
               </button>
               <button
                 type="button"
@@ -231,7 +231,7 @@ export function LibraryImportModal({ open, projectID, onClose, onImported }: Lib
               </label>
               <input
                 type="file"
-                accept=".pdf,.txt"
+                accept=".pdf,.txt,.md"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
                 className="block w-full rounded-lg border border-stone-300 px-3 py-2 text-sm text-stone-700"
                 disabled={submitting}

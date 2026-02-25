@@ -9,7 +9,7 @@ import { publishInProject } from "@/bus"
 import { fsCreated, fsUpdated } from "@/bus"
 import { PineconeService, sparseVectorFromText } from "@/vectorstore"
 import { chunkText, embedChunks } from "./etl"
-import { parseFileBuffer, parseYouTubeTranscript, makeShortHash } from "./parser"
+import { inferFileExt, makeShortHash, parseFileBuffer, parseYouTubeTranscript } from "./parser"
 import { buildSummary, renderSummaryMarkdown, slugifyTitle } from "./summary"
 import {
   LibraryDocInfo,
@@ -26,7 +26,29 @@ import {
 const DEFAULT_IMPORT_MAX_PDF_MB = 4
 const DEFAULT_IMPORT_MAX_TXT_MB = 4
 
-const pinecone = new PineconeService()
+let pineconeCache:
+  | {
+    key: string
+    service: PineconeService
+  }
+  | undefined
+
+function pineconeConfigKey() {
+  const apiKey = process.env.PINECONE_API_KEY?.trim() ?? ""
+  const indexName = process.env.OW_PINECONE_INDEX?.trim() ?? ""
+  return `${apiKey}::${indexName}`
+}
+
+function getPineconeService() {
+  const key = pineconeConfigKey()
+  if (!pineconeCache || pineconeCache.key !== key) {
+    pineconeCache = {
+      key,
+      service: new PineconeService(),
+    }
+  }
+  return pineconeCache.service
+}
 
 function docsRootLogical(projectID: string) {
   return logicalWorkspacePath(projectID, "inputs/library/docs")
@@ -311,16 +333,12 @@ export async function createImport(input: {
         throw new LibraryServiceError("INVALID_FILE", "File name is required")
       }
 
-      const ext = name.toLowerCase().endsWith(".pdf")
-        ? "pdf"
-        : name.toLowerCase().endsWith(".txt")
-          ? "txt"
-          : ""
+      const ext = inferFileExt(name)
       if (!ext) {
-        throw new LibraryServiceError("UNSUPPORTED_FILE_TYPE", "Only PDF and TXT files are supported")
+        throw new LibraryServiceError("UNSUPPORTED_FILE_TYPE", "Only PDF, TXT, and MD files are supported")
       }
 
-      const maxBytes = importMaxBytesForExt(ext as LibraryFileExt)
+      const maxBytes = importMaxBytesForExt(ext)
       if (input.file.size > maxBytes) {
         throw new LibraryServiceError(
           "FILE_TOO_LARGE",
@@ -328,7 +346,7 @@ export async function createImport(input: {
         )
       }
 
-      const payloadPath = getPayloadPath(input.projectID, importID, ext as LibraryFileExt)
+      const payloadPath = getPayloadPath(input.projectID, importID, ext)
       await ensureDir(path.dirname(payloadPath))
       await fs.writeFile(payloadPath, input.file.bytes)
 
@@ -339,7 +357,7 @@ export async function createImport(input: {
           mode: "file",
           replace_doc_id: replaceDocID,
           file_name: name,
-          file_ext: ext as LibraryFileExt,
+          file_ext: ext,
           file_mime: input.file.type,
           file_size: input.file.size,
           payload_path: payloadPath,
@@ -506,6 +524,7 @@ export async function listPendingImports() {
 export async function processImport(importTask: LibraryImportInfoType) {
     const projectID = importTask.project_id
     const importID = importTask.id
+    const pinecone = getPineconeService()
 
     await markStage(projectID, importID, "validating")
 
@@ -682,7 +701,7 @@ export async function processImport(importTask: LibraryImportInfoType) {
   }
 
 export function isPineconeEnabled() {
-  return pinecone.enabled
+  return getPineconeService().enabled
 }
 
 export function buildIdempotencyFingerprint(input: {

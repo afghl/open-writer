@@ -26,6 +26,10 @@ export default tseslint.config(
               group: ["@/*/*", "!@/*/index", "!@/util/*", "!@/util/**"],
               message: "Import from module index only (e.g. '@/session').",
             },
+            {
+              regex: "^\\.\\./(?!\\.)[^/]+/.+$",
+              message: "Do not use deep parent-relative imports; use alias import or module index instead.",
+            },
           ],
         },
       ],

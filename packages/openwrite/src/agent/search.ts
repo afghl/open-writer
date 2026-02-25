@@ -1,8 +1,8 @@
 import { BaseAgent } from "./types"
 import SYSTEM_PROMPT from "./search.txt"
 import { rootHolder } from "@/global"
-import { SEARCH_TOOL_IDS } from "../tool/search-shared"
 import { composeAgentPrompt } from "./prompt-compose"
+import { SEARCH_TOOL_IDS } from "./search-shared"
 
 const SEARCH_AGENT_TOOL_IDS = [
   ...Array.from(SEARCH_TOOL_IDS),

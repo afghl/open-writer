@@ -7,13 +7,19 @@ import path from "node:path"
 let namespaceRoot = ""
 let projectID = ""
 let prevAPIKey = ""
+let prevPineconeAPIKey = ""
+let prevPineconeIndex = ""
 
 beforeAll(async () => {
   namespaceRoot = await mkdtemp(path.join(os.tmpdir(), "openwrite-library-route-"))
   process.env.OW_NAMESPACE = namespaceRoot
   process.env.OW_DATA_DIR = path.join(namespaceRoot, "data")
   prevAPIKey = process.env.OPENAI_API_KEY ?? ""
+  prevPineconeAPIKey = process.env.PINECONE_API_KEY ?? ""
+  prevPineconeIndex = process.env.OW_PINECONE_INDEX ?? ""
   process.env.OPENAI_API_KEY = ""
+  process.env.PINECONE_API_KEY = ""
+  process.env.OW_PINECONE_INDEX = ""
 
   const { Project } = await import("../../src/project")
   const project = await Project.create({
@@ -25,6 +31,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   process.env.OPENAI_API_KEY = prevAPIKey
+  process.env.PINECONE_API_KEY = prevPineconeAPIKey
+  process.env.OW_PINECONE_INDEX = prevPineconeIndex
   if (namespaceRoot) {
     await rm(namespaceRoot, { recursive: true, force: true })
   }
@@ -36,7 +44,7 @@ test("library import API rejects unsupported file extension", async () => {
   setupRoutes(app)
 
   const formData = new FormData()
-  formData.set("file", new File(["hello"], "sample.md", { type: "text/markdown" }))
+  formData.set("file", new File(["hello"], "sample.docx", { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }))
 
   const response = await app.request("http://localhost/api/library/import", {
     method: "POST",
@@ -52,14 +60,14 @@ test("library import API rejects unsupported file extension", async () => {
   expect(payload.code).toBe("UNSUPPORTED_FILE_TYPE")
 })
 
-test("library import API writes canonical source text path", async () => {
+test("library import API writes canonical source text path for markdown upload", async () => {
   const { setupRoutes } = await import("../../src/server/route")
   const { resolveWorkspacePath } = await import("../../src/util/workspace-path")
   const app = new Hono()
   setupRoutes(app)
 
   const formData = new FormData()
-  formData.set("file", new File(["line1\nline2\nline3"], "sample.txt", { type: "text/plain" }))
+  formData.set("file", new File(["line1\nline2\nline3"], "sample.md", { type: "text/markdown" }))
 
   const createResponse = await app.request("http://localhost/api/library/import", {
     method: "POST",

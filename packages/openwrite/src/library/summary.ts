@@ -123,7 +123,7 @@ export async function buildSummary(input: {
     const errorMessage = error instanceof Error ? error.message : String(error)
     log.error("Summary generation failed", {
       sourceLabel: input.sourceLabel,
-      text: input.text.slice(0, 12000),
+      text: input.text.slice(0, 100),
       error: errorMessage,
     })
     return fallbackSummary(input.text)

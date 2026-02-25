@@ -6,7 +6,7 @@ export type LibraryImportMode = z.infer<typeof LibraryImportMode>
 export const LibrarySourceType = z.enum(["file", "youtube"])
 export type LibrarySourceType = z.infer<typeof LibrarySourceType>
 
-export const LibraryFileExt = z.enum(["pdf", "txt"])
+export const LibraryFileExt = z.enum(["pdf", "txt", "md"])
 export type LibraryFileExt = z.infer<typeof LibraryFileExt>
 
 export const LibraryDocStatus = z.enum(["ready", "error"])
