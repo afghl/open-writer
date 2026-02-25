@@ -1,25 +1,3 @@
-export const DEFAULT_SCOPE_PATHS = [
-  "inputs/library/docs",
-] as const
-
-export const DEFAULT_SCOPE_EXTENSIONS = [
-  ".pdf",
-  ".txt",
-  ".md",
-  ".markdown",
-  ".json",
-] as const
-
-export type SearchScope = {
-  paths: string[]
-  extensions: string[]
-}
-
-export type SearchScopeInput = {
-  paths?: string[]
-  extensions?: string[]
-}
-
 export type ChunkMetadata = {
   offset_start: number
   text_len: number
@@ -76,7 +54,8 @@ export type AtomicSearchStats = {
 
 export type AtomicSearchResult = {
   query: string
-  scope: SearchScope
+  doc_ids: string[]
+  keywords: string[]
   results: RerankedEvidence[]
   missing_chunk_ids: string[]
   stats: AtomicSearchStats

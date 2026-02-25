@@ -1,7 +1,6 @@
 export {
   searchCandidates,
   fetchChunks,
-  normalizeScope,
   resetSearchCache,
 } from "./retrieval"
 export { rerankEvidence } from "./rerank-evidence"
@@ -11,8 +10,6 @@ export type {
   CandidateChunk,
   RerankedEvidence,
   SearchChunk,
-  SearchScope,
-  SearchScopeInput,
   SearchStats,
   SearchResult,
 } from "./types"

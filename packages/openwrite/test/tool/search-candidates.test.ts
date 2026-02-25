@@ -3,7 +3,8 @@ import { afterAll, beforeEach, expect, mock, test } from "bun:test"
 const searchCalls: Array<{
   projectID: string
   query: string
-  scope: { paths: string[]; extensions: string[] }
+  docIDs?: string[]
+  keywords: string[]
   k?: number
 }> = []
 
@@ -28,16 +29,11 @@ let fetchMissingChunkIDs: string[] = []
 let rerankMissingChunkIDs: string[] = []
 
 mock.module("@/search", () => ({
-  normalizeScope(input?: { paths?: string[]; extensions?: string[] }) {
-    return {
-      paths: input?.paths ?? ["inputs/library/docs"],
-      extensions: input?.extensions ?? [".pdf", ".txt"],
-    }
-  },
   async searchCandidates(input: {
     projectID: string
     query: string
-    scope: { paths: string[]; extensions: string[] }
+    docIDs?: string[]
+    keywords: string[]
     k?: number
   }) {
     searchCalls.push(input)
@@ -143,10 +139,8 @@ test("pinecone_hybrid_search runs retrieve->fetch->rerank and returns atomic res
   const result = await tool.execute(
     {
       query: "find evidence",
-      scope: {
-        paths: ["inputs/library/docs"],
-        extensions: [".pdf"],
-      },
+      doc_ids: ["doc_abc", "doc_def", "doc_abc"],
+      keywords: ["vibe coding", "agentic engineering", "agentic engineering"],
     },
     {
       sessionID: "session-1",
@@ -168,15 +162,19 @@ test("pinecone_hybrid_search runs retrieve->fetch->rerank and returns atomic res
 
   expect(searchCalls).toHaveLength(1)
   expect(searchCalls[0]?.k).toBe(15)
+  expect(searchCalls[0]?.docIDs).toEqual(["doc_abc", "doc_def"])
+  expect(searchCalls[0]?.keywords).toEqual(["vibe coding", "agentic engineering"])
   expect(fetchCalls).toHaveLength(1)
   expect(fetchCalls[0]?.chunkIDs).toEqual(["doc_abc::0", "doc_abc::1"])
   expect(rerankCalls).toHaveLength(1)
   expect(rerankCalls[0]?.topK).toBe(10)
   expect(askCalls[0]?.permission).toBe("read")
-  expect(askCalls[0]?.patterns).toEqual(["inputs/library/docs"])
+  expect(askCalls[0]?.patterns).toEqual(["inputs/library/**"])
 
   const parsed = JSON.parse(result.output) as {
     query: string
+    doc_ids: string[]
+    keywords: string[]
     results: Array<{ chunk_id: string; text: string }>
     missing_chunk_ids: string[]
     stats: {
@@ -188,6 +186,8 @@ test("pinecone_hybrid_search runs retrieve->fetch->rerank and returns atomic res
   }
 
   expect(parsed.query).toBe("find evidence")
+  expect(parsed.doc_ids).toEqual(["doc_abc", "doc_def"])
+  expect(parsed.keywords).toEqual(["vibe coding", "agentic engineering"])
   expect(parsed.results).toHaveLength(1)
   expect(parsed.results[0]?.chunk_id).toBe("doc_abc::0")
   expect(parsed.results[0]?.text).toBe("Evidence text A")
@@ -206,6 +206,7 @@ test("pinecone_hybrid_search uses fixed retrieve/topK and keeps fallback flag", 
   const result = await tool.execute(
     {
       query: "find evidence",
+      keywords: ["alpha", "beta"],
     },
     {
       sessionID: "session-2",
@@ -222,6 +223,8 @@ test("pinecone_hybrid_search uses fixed retrieve/topK and keeps fallback flag", 
 
   expect(searchCalls).toHaveLength(1)
   expect(searchCalls[0]?.k).toBe(15)
+  expect(searchCalls[0]?.docIDs).toBeUndefined()
+  expect(searchCalls[0]?.keywords).toEqual(["alpha", "beta"])
   expect(rerankCalls).toHaveLength(1)
   expect(rerankCalls[0]?.topK).toBe(10)
 
@@ -231,4 +234,78 @@ test("pinecone_hybrid_search uses fixed retrieve/topK and keeps fallback flag", 
     }
   }
   expect(parsed.stats.fallback).toBe(true)
+})
+
+test("pinecone_hybrid_search rejects missing keywords", async () => {
+  const { PineconeHybridSearchTool } = await import("../../src/tool/search-candidates")
+  const tool = await PineconeHybridSearchTool.init()
+
+  await expect(
+    tool.execute(
+      {
+        query: "find evidence",
+      } as unknown as { query: string; keywords: string[] },
+      {
+        sessionID: "session-3",
+        messageID: "message-3",
+        agent: "search",
+        threadID: "thread-3",
+        projectID: "project-test-search-candidates",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: async () => {},
+        ask: async () => {},
+      },
+    ),
+  ).rejects.toThrow("调用参数无效")
+})
+
+test("pinecone_hybrid_search rejects empty keywords array", async () => {
+  const { PineconeHybridSearchTool } = await import("../../src/tool/search-candidates")
+  const tool = await PineconeHybridSearchTool.init()
+
+  await expect(
+    tool.execute(
+      {
+        query: "find evidence",
+        keywords: [],
+      },
+      {
+        sessionID: "session-4",
+        messageID: "message-4",
+        agent: "search",
+        threadID: "thread-4",
+        projectID: "project-test-search-candidates",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: async () => {},
+        ask: async () => {},
+      },
+    ),
+  ).rejects.toThrow("调用参数无效")
+})
+
+test("pinecone_hybrid_search rejects keywords that become empty after normalization", async () => {
+  const { PineconeHybridSearchTool } = await import("../../src/tool/search-candidates")
+  const tool = await PineconeHybridSearchTool.init()
+
+  await expect(
+    tool.execute(
+      {
+        query: "find evidence",
+        keywords: ["   ", "\n\t"],
+      },
+      {
+        sessionID: "session-5",
+        messageID: "message-5",
+        agent: "search",
+        threadID: "thread-5",
+        projectID: "project-test-search-candidates",
+        abort: new AbortController().signal,
+        messages: [],
+        metadata: async () => {},
+        ask: async () => {},
+      },
+    ),
+  ).rejects.toThrow("keywords cannot be empty after normalization")
 })

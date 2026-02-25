@@ -3,12 +3,6 @@ import { afterAll, expect, mock, test } from "bun:test"
 const fetchCalls: Array<{ projectID: string; chunkIDs: string[] }> = []
 
 mock.module("@/search", () => ({
-  normalizeScope(input?: { paths?: string[]; extensions?: string[] }) {
-    return {
-      paths: input?.paths ?? ["inputs/library/docs"],
-      extensions: input?.extensions ?? [".pdf", ".txt"],
-    }
-  },
   async searchCandidates() {
     return {
       candidates: [],

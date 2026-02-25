@@ -1,58 +1,12 @@
 import { promises as fs } from "node:fs"
-import path from "node:path"
 import { PineconeService, sparseVectorFromText } from "@/vectorstore"
-import { toPosixPath, trimPosixSlashes } from "@/util/path-format"
-import { logicalWorkspacePath, resolveWorkspacePath } from "@/util/workspace-path"
-import type { SearchChunk, SearchResult, SearchScope, SearchScopeInput } from "./types"
-import { DEFAULT_SCOPE_EXTENSIONS, DEFAULT_SCOPE_PATHS } from "./types"
+import { resolveWorkspacePath } from "@/util/workspace-path"
+import type { SearchChunk, SearchResult } from "./types"
 import { LLM } from "@/llm"
+import { Log } from "@/util/log"
 
 const pinecone = new PineconeService()
-
-function normalizeScopePath(input: string) {
-  const normalized = trimPosixSlashes(input)
-  if (!normalized) {
-    throw new Error("Scope path cannot be empty")
-  }
-  if (normalized.includes("..")) {
-    throw new Error(`Scope path cannot include '..': ${input}`)
-  }
-  if (!(normalized === "inputs/library" || normalized.startsWith("inputs/library/"))) {
-    throw new Error(`Scope path must stay under inputs/library: ${input}`)
-  }
-  return normalized
-}
-
-function normalizeExtension(input: string) {
-  const trimmed = input.trim().toLowerCase()
-  if (!trimmed) {
-    throw new Error("Scope extension cannot be empty")
-  }
-  return trimmed.startsWith(".") ? trimmed : `.${trimmed}`
-}
-
-export function normalizeScope(input?: SearchScopeInput): SearchScope {
-  const paths = (input?.paths?.length ? input.paths : Array.from(DEFAULT_SCOPE_PATHS)).map(normalizeScopePath)
-  const extensions = (
-    input?.extensions?.length
-      ? input.extensions
-      : Array.from(DEFAULT_SCOPE_EXTENSIONS)
-  ).map(normalizeExtension)
-
-  return {
-    paths: Array.from(new Set(paths)),
-    extensions: Array.from(new Set(extensions)),
-  }
-}
-
-
-function extensionOf(filePath: string) {
-  return path.extname(filePath).toLowerCase()
-}
-
-function pathInScope(sourcePath: string, scopePaths: string[]) {
-  return scopePaths.some((prefix) => sourcePath === prefix || sourcePath.startsWith(`${prefix}/`))
-}
+const log = Log.create({ service: "search.retrieval" })
 
 function readMetadataString(metadata: Record<string, string | number | boolean>, key: string) {
   const raw = metadata[key]
@@ -125,11 +79,26 @@ function isParsedCandidate(
 export async function searchCandidates(input: {
   projectID: string
   query: string
-  scope?: SearchScopeInput
+  docIDs?: string[]
+  keywords: string[]
   k?: number
   signal?: AbortSignal
 }): Promise<SearchResult> {
-  const scope = normalizeScope(input.scope)
+  const keywords = Array.from(new Set(
+    input.keywords
+      .map((keyword) => keyword.trim())
+      .filter((keyword) => keyword.length > 0),
+  ))
+  if (keywords.length === 0) {
+    throw new Error("keywords cannot be empty")
+  }
+
+  const docIDs = Array.from(new Set(
+    (input.docIDs ?? [])
+      .map((docID) => docID.trim())
+      .filter((docID) => docID.length > 0),
+  ))
+
   const k = Math.max(1, Math.min(50, input.k ?? 20))
 
   if (!pinecone.enabled) {
@@ -141,16 +110,22 @@ export async function searchCandidates(input: {
     signal: input.signal,
   })
 
-  const sparseVector = sparseVectorFromText(input.query)
+  const sparseVector = sparseVectorFromText(keywords.join(" "))
   const overfetch = Math.max(k * 4, k)
+  const filter = docIDs.length > 0
+    ? {
+        doc_id: { $in: docIDs },
+      }
+    : undefined
   const matches = await pinecone.query({
     projectID: input.projectID,
     values: queryVector,
     sparseValues: sparseVector,
     topK: overfetch,
+    ...(filter ? { filter } : {}),
   })
 
-  const candidates = matches
+  const parsedCandidates = matches
     .map((match) => parseSearchCandidate({
       projectID: input.projectID,
       id: match.id,
@@ -158,17 +133,22 @@ export async function searchCandidates(input: {
       metadata: match.metadata,
     }))
     .filter(isParsedCandidate)
-    .filter((candidate) => {
-      return (
-        pathInScope(candidate.source_path, scope.paths)
-        && scope.extensions.includes(extensionOf(candidate.source_path))
-      )
-    })
+  const candidates = parsedCandidates
     .slice(0, k)
     .map((item, index) => ({
       ...item,
       rank: index + 1,
     }))
+
+  log.debug("searchCandidates filtered", {
+    projectID: input.projectID,
+    query: input.query,
+    candidate_hits: matches.length,
+    parsed_candidates: parsedCandidates.length,
+    returned_candidates: candidates.length,
+    doc_ids_count: docIDs.length,
+    keywords_count: keywords.length,
+  })
 
   return {
     candidates,

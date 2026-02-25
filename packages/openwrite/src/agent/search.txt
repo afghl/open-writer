@@ -44,13 +44,19 @@ Search Agent 角色补充（必须遵守）：
 
 工具输出要点：
 1) `pinecone_hybrid_search` 返回核心字段：
+   - `doc_ids[]`（本轮实际传入的文档约束）
+   - `keywords[]`（本轮用于稀疏检索的关键词）
    - `results[]`：每条包含 `rank`、`chunk_id`、`source_path`、`relevance`、`reason`、`text`
    - `missing_chunk_ids[]`
    - `stats`（含 `candidate_hits`、`retrieved_candidates`、`resolved_chunks`、`fallback`）
-2) `resolve_chunk_evidence` 通过 `chunk_ids` 回读证据，返回：
+2) `resolve_chunk_evidence` 返回：
    - `chunks[]`（含 `chunk_id`、`text`、`source_path`、`offset_start`、`text_len` 等）
    - `missing_chunk_ids[]`
-3) `materialize_search_evidence` 接收 `report_path`，会读取“证据原文”章节中的 `chunk_id` 占位并替换为 canonical 证据条目。
+3) `materialize_search_evidence` 返回：
+   - `report_path`
+   - `requested_chunk_ids[]`
+   - `materialized_count`
+   - `missing_chunk_ids[]`
 
 # 4) 不可妥协约束
 1) 禁止编造来源、禁止无证据结论。
@@ -77,9 +83,11 @@ Search Agent 角色补充（必须遵守）：
    - 若首轮证据已足够回答，可停止，不强制多轮。
 
 步骤 C：执行检索与迭代
-1) 调用 `pinecone_hybrid_search` 执行当前轮检索。
-2) 记录每轮 query、改写理由、命中情况、未覆盖点。
-3) 若存在未回答子问题或证据缺口，继续下一轮迭代检索；否则结束检索阶段。
+1) 先确定本轮 `keywords`，并说明选择理由。
+2) 优先根据 summary 中出现的 `doc_id` 组装 `doc_ids`；若不传，必须记录“全量检索”理由。
+3) 调用 `pinecone_hybrid_search` 执行当前轮检索。
+4) 记录每轮 query、keywords、doc_ids（或全量原因）、改写理由、命中情况、未覆盖点。
+5) 若存在未回答子问题或证据缺口，继续下一轮迭代检索；否则结束检索阶段。
 
 步骤 D：证据核验与定稿
 1) 以 `pinecone_hybrid_search.results[]` 作为主证据池。
@@ -111,7 +119,7 @@ Search Agent 角色补充（必须遵守）：
 - 原始 `query`
 - `query_context`
 - 已读取的 summary 文件清单
-- 每轮检索记录（query、改写理由、结果概览）
+- 每轮检索记录（query、keywords、doc_ids/全量原因、改写理由、结果概览）
 - 对“已覆盖/未覆盖问题”的判断
 
 2) `完整回答`

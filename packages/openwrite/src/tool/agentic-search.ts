@@ -1,6 +1,9 @@
 import z from "zod"
+import { promises as fs } from "node:fs"
+import path from "node:path"
 import { Session, SessionPrompt, type MessageTextPart, type MessageWithParts } from "@/session"
 import { resolveUniqueSearchReportPath, searchReportPathPlaceholder } from "@/util/search-report-path"
+import { resolveWorkspacePath } from "@/util/workspace-path"
 import { fromAgent } from "./from-agent"
 import DESCRIPTION from "./agentic-search.txt"
 
@@ -28,12 +31,31 @@ export type AgenticSearchRunOutput = {
   message: MessageWithParts
 }
 
+const REPORT_SKELETON = [
+  "## 问题回顾和思考",
+  "## 完整回答",
+  "## 证据原文",
+].join("\n")
+
 function upsertReportPathInPrompt(promptText: string, reportPath: string) {
   const lines = promptText
     .split("\n")
     .filter((line) => !/^\s*report_path\s*:/i.test(line))
   lines.push(`report_path: ${reportPath}`)
   return lines.join("\n")
+}
+
+async function ensureReportSkeletonFile(input: {
+  projectID: string
+  reportPath: string
+}) {
+  const { resolvedPath } = resolveWorkspacePath(input.reportPath, input.projectID)
+  await fs.mkdir(path.dirname(resolvedPath), { recursive: true })
+  try {
+    await fs.access(resolvedPath)
+  } catch {
+    await fs.writeFile(resolvedPath, REPORT_SKELETON, "utf8")
+  }
 }
 
 export function buildSearchPrompt(input: {
@@ -96,6 +118,10 @@ export async function runAgenticSearch(input: AgenticSearchRunInput): Promise<Ag
     reportPath: expectedReportPath,
   })
   const promptText = upsertReportPathInPrompt(basePromptText, expectedReportPath)
+  await ensureReportSkeletonFile({
+    projectID: input.projectID,
+    reportPath: expectedReportPath,
+  })
 
   const tempSession = await Session.create({
     projectID: input.projectID,
