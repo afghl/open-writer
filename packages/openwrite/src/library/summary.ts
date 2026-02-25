@@ -109,7 +109,7 @@ export async function buildSummary(input: {
         prompt,
       }),
       new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("Summary generation timed out")), 15_000)
+        setTimeout(() => reject(new Error("Summary generation timed out")), 100_000)
       }),
     ])
     const summary = normalizeSummary(result.object, input.text)
